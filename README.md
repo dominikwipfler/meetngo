@@ -12,22 +12,36 @@ Dieses Repository enthält die UI-Implementierung der MeetNGo Mobile App, basier
 ## Voraussetzungen
 
 - Node.js 18 oder neuer
-- pnpm installiert (`npm install -g pnpm`)
 - Git installiert, wenn du das Projekt versionieren möchtest
+- Optional: pnpm installiert (`npm install -g pnpm`), wenn du lieber pnpm nutzen willst
 
 ## Lokaler Start
 
 1. Abhängigkeiten installieren:
 
+Mit npm:
+```bash
+npm install
+```
+
+Alternativ mit pnpm:
 ```bash
 pnpm install
 ```
 
 2. Entwicklungsserver starten:
 
+Mit npm:
+```bash
+npm run dev
+```
+
+Alternativ mit pnpm:
 ```bash
 pnpm dev
 ```
+
+> `npm` ist der Standard-Paketmanager für Node.js und funktioniert hier genauso wie `pnpm`. `pnpm` ist nur ein schnelleres, speicherplatzsparendes Tool. Du kannst also einfach `npm install` nutzen.
 
 3. Öffne die angezeigte URL im Browser (standardmäßig `http://localhost:5173`)
 
