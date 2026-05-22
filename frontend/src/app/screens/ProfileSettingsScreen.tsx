@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { ArrowLeft, ChevronDown } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../components/ui/accordion";
-import { AccessibilityButton } from "../components/AccessibilityButton";
-
+import { Switch } from "../components/ui/switch";
 const availableInterests = [
   "Musik",
   "Sport",
@@ -23,6 +23,8 @@ const availableInterests = [
 
 export function ProfileSettingsScreen() {
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
+  const [highContrast, setHighContrast] = useState(false);
   const [username, setUsername] = useState("maxmustermann");
   const [email, setEmail] = useState("max@example.com");
   const [selectedInterests, setSelectedInterests] = useState([
@@ -47,7 +49,7 @@ export function ProfileSettingsScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-6">
+    <div className="bg-background pb-6">
       <div className="sticky top-0 bg-card border-b border-border px-4 py-4 flex items-center gap-4 z-10">
         <button
           onClick={() => navigate(-1)}
@@ -144,6 +146,32 @@ export function ProfileSettingsScreen() {
           </div>
         </div>
 
+        <div className="space-y-4">
+          <h3>Darstellung</h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+              <div>
+                <p>Dark Mode</p>
+                <p className="text-sm text-muted-foreground">Dunkles Farbschema</p>
+              </div>
+              <Switch
+                checked={theme === "dark"}
+                onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+              />
+            </div>
+            <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+              <div>
+                <p>Hoher Kontrast</p>
+                <p className="text-sm text-muted-foreground">Bessere Lesbarkeit</p>
+              </div>
+              <Switch
+                checked={highContrast}
+                onCheckedChange={setHighContrast}
+              />
+            </div>
+          </div>
+        </div>
+
         <Button
           onClick={handleSave}
           className="w-full h-12 bg-primary hover:bg-primary/90"
@@ -152,7 +180,6 @@ export function ProfileSettingsScreen() {
         </Button>
       </div>
 
-      <AccessibilityButton />
     </div>
   );
 }

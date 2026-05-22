@@ -1,0 +1,57 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+/* ── Safe-area & nav-height variables ───────────────────────────────────── */
+:root {
+  --nav-h: 4rem;                                    /* BottomNav: 64 px */
+  --safe-b: env(safe-area-inset-bottom, 0px);       /* Home-Indicator-Bereich */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --nav-total: calc(var(--nav-h) + var(--safe-b));  /* Gesamter unterer Bereich */
+}
+
+/* ── App-Shell: maximal 430 px zentriert (wie ein Phone-Frame) ───────────── */
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+  /* Auf Desktop: seitliche Schatten simulieren Phone-Rahmen */
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 8px 48px rgba(0,0,0,0.18);
+}
+
+/* Seiten-Hintergrund auf Desktop */
+body {
+  background: #0f0f0f;
+}
+
+/* ── Utility: Padding für alle Screens mit BottomNav ─────────────────────── */
+.pb-nav     { padding-bottom: var(--nav-total); }
+.mb-nav     { margin-bottom: var(--nav-total); }
+.bottom-nav { bottom: var(--nav-total); }
+
+/* ── Leaflet z-Index-Hierarchie ──────────────────────────────────────────── */
+.leaflet-pane         { z-index: 0 !important; }
+.leaflet-tile-pane    { z-index: 1 !important; }
+.leaflet-overlay-pane { z-index: 2 !important; }
+.leaflet-marker-pane  { z-index: 3 !important; }
+.leaflet-tooltip-pane { z-index: 4 !important; }
+.leaflet-popup-pane   { z-index: 5 !important; }
+.leaflet-control      { z-index: 6 !important; }
+
+/* ── Leaflet Popup-Styling ───────────────────────────────────────────────── */
+.leaflet-popup-content-wrapper {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15) !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+.leaflet-popup-content { margin: 12px !important; }
+.leaflet-popup-tip-container { margin-top: -1px; }
+
+/* ── Scrollbar ausblenden ────────────────────────────────────────────────── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }

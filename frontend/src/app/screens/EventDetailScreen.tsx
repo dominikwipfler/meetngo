@@ -1,24 +1,54 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { ArrowLeft, MapPin, Calendar, Users, UserPlus } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Avatar } from "../components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../components/ui/sheet";
 import { Label } from "../components/ui/label";
-import { AccessibilityButton } from "../components/AccessibilityButton";
-import { getEventById } from "../data/events";
+import { getEventById, getImageUrl } from "../../api/events";
+import type { ApiEvent } from "../../api/events";
+
+function formatDate(dateStr: string): string {
+  try {
+    return new Date(dateStr).toLocaleString("de-DE", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }) + " Uhr";
+  } catch {
+    return dateStr;
+  }
+}
 
 export function EventDetailScreen() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const event = getEventById(Number(id));
-
+  const [event, setEvent] = useState<ApiEvent | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showTicketSheet, setShowTicketSheet] = useState(false);
   const [ticketQuantity, setTicketQuantity] = useState(1);
 
+  useEffect(() => {
+    if (!id) return;
+    getEventById(Number(id))
+      .then(setEvent)
+      .catch(() => setEvent(null))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex-1 bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Wird geladen...</p>
+      </div>
+    );
+  }
+
   if (!event) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex-1 bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Event nicht gefunden</p>
       </div>
     );
@@ -29,16 +59,17 @@ export function EventDetailScreen() {
     navigate("/tickets");
   };
 
-  const priceValue = parseFloat(event.price.replace(",", "."));
   const isFree = event.price === "Kostenlos";
+  const priceValue = isFree ? 0 : parseFloat(event.price.replace(",", "."));
+  const imageUrl = getImageUrl(event.image_path);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <div className="relative h-72">
-        {event.imageUrl ? (
+        {imageUrl ? (
           <div
             className="w-full h-full bg-cover bg-center"
-            style={{ backgroundImage: `url(${event.imageUrl})` }}
+            style={{ backgroundImage: `url(${imageUrl})` }}
           >
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
           </div>
@@ -53,14 +84,14 @@ export function EventDetailScreen() {
         </button>
       </div>
 
-      <div className="px-4 -mt-6 pb-24">
+      <div className="px-4 -mt-6 pb-6">
         <div className="bg-card rounded-xl p-6 shadow-lg space-y-6">
           <div>
             <h1 className="text-2xl mb-3 break-words">{event.name}</h1>
             <div className="space-y-2 text-muted-foreground">
               <div className="flex items-start gap-2">
                 <Calendar className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span className="text-sm">{event.date}</span>
+                <span className="text-sm">{formatDate(event.date)}</span>
               </div>
               <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -90,10 +121,7 @@ export function EventDetailScreen() {
             </div>
             <div className="flex -space-x-2">
               {[1, 2, 3, 4, 5].map((i) => (
-                <Avatar
-                  key={i}
-                  className="w-8 h-8 border-2 border-card bg-primary/20"
-                />
+                <Avatar key={i} className="w-8 h-8 border-2 border-card bg-primary/20" />
               ))}
             </div>
           </div>
@@ -116,7 +144,7 @@ export function EventDetailScreen() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t border-border">
+      <div className="sticky bottom-0 p-4 bg-card border-t border-border">
         <Button
           onClick={() => setShowTicketSheet(true)}
           className="w-full h-12 bg-accent hover:bg-accent/90"
@@ -128,9 +156,7 @@ export function EventDetailScreen() {
       <Sheet open={showTicketSheet} onOpenChange={setShowTicketSheet}>
         <SheetContent side="bottom" className="rounded-t-xl">
           <SheetHeader>
-            <SheetTitle>
-              {isFree ? "Teilnahme bestätigen" : "Ticket kaufen"}
-            </SheetTitle>
+            <SheetTitle>{isFree ? "Teilnahme bestätigen" : "Ticket kaufen"}</SheetTitle>
           </SheetHeader>
           <div className="space-y-6 mt-6">
             <div>
@@ -139,13 +165,9 @@ export function EventDetailScreen() {
                 <div className="flex justify-between items-center">
                   <div>
                     <p>Standard Ticket</p>
-                    <p className="text-sm text-muted-foreground">
-                      Zugang zum Event
-                    </p>
+                    <p className="text-sm text-muted-foreground">Zugang zum Event</p>
                   </div>
-                  <p className="font-medium">
-                    {isFree ? "Kostenlos" : `${event.price} €`}
-                  </p>
+                  <p className="font-medium">{isFree ? "Kostenlos" : `${event.price} €`}</p>
                 </div>
               </div>
             </div>
@@ -210,7 +232,6 @@ export function EventDetailScreen() {
         </SheetContent>
       </Sheet>
 
-      <AccessibilityButton />
     </div>
   );
 }
