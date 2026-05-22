@@ -6,7 +6,9 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Switch } from "../components/ui/switch";
-import { AccessibilityButton } from "../components/AccessibilityButton";
+import { createEvent } from "../../api/events";
+
+const CATEGORIES = ["Musik", "Sport", "Kunst", "Food", "Tech", "Outdoor", "Sonstiges"];
 
 export function CreateEventScreen() {
   const navigate = useNavigate();
@@ -18,45 +20,63 @@ export function CreateEventScreen() {
   const [date, setDate] = useState("");
   const [price, setPrice] = useState("");
   const [capacity, setCapacity] = useState("");
+  const [category, setCategory] = useState("Sonstiges");
   const [featured, setFeatured] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Datei ist zu groß. Maximum 5MB erlaubt.");
-        return;
-      }
-
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Datei ist zu groß. Maximum 5MB erlaubt.");
+      return;
     }
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
   const handleRemoveImage = () => {
     setImageFile(null);
     setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
+    setError("");
     if (!title || !description || !location || !date) {
-      alert("Bitte fülle alle Pflichtfelder aus");
+      setError("Bitte fülle alle Pflichtfelder aus");
       return;
     }
-    navigate("/organizer-dashboard");
+
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("name", title);
+      formData.append("description", description);
+      formData.append("location", location);
+      formData.append("date", date);
+      formData.append("price", price || "Kostenlos");
+      formData.append("capacity", capacity);
+      formData.append("category", category);
+      formData.append("featured", String(featured));
+      if (imageFile) formData.append("image", imageFile);
+
+      await createEvent(formData);
+      navigate("/organizer-dashboard");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Fehler beim Erstellen des Events");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background pb-6">
+    <div className="bg-background pb-6">
       <div className="sticky top-0 bg-card border-b border-border px-4 py-4 flex items-center gap-4 z-10">
         <button
           onClick={() => navigate(-1)}
@@ -69,7 +89,7 @@ export function CreateEventScreen() {
 
       <div className="px-4 py-6 space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="image">Event-Bild *</Label>
+          <Label htmlFor="image">Event-Bild</Label>
           {imagePreview ? (
             <div className="relative">
               <div
@@ -93,7 +113,7 @@ export function CreateEventScreen() {
                 Bild hochladen (max. 5MB)
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                JPG, PNG oder WebP
+                JPG, PNG oder WebP — wird in <code>/backend/uploads/</code> gespeichert
               </p>
             </div>
           )}
@@ -127,6 +147,25 @@ export function CreateEventScreen() {
             onChange={(e) => setDescription(e.target.value)}
             className="min-h-[120px]"
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="category">Kategorie</Label>
+          <div className="flex flex-wrap gap-2">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                className={`px-4 py-2 rounded-full text-sm border transition-colors ${
+                  category === cat
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border hover:border-primary"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -194,15 +233,19 @@ export function CreateEventScreen() {
           />
         </div>
 
+        {error && (
+          <p className="text-sm text-destructive text-center">{error}</p>
+        )}
+
         <Button
           onClick={handlePublish}
+          disabled={loading}
           className="w-full h-12 bg-accent hover:bg-accent/90"
         >
-          Veröffentlichen
+          {loading ? "Wird veröffentlicht..." : "Veröffentlichen"}
         </Button>
       </div>
 
-      <AccessibilityButton />
     </div>
   );
 }

@@ -1,68 +1,147 @@
-# MeetNGo Mobile App UI
+# MeetNGo
 
-Dieses Repository enthält die UI-Implementierung der MeetNGo Mobile App, basierend auf einem Figma-Design.
+Eine Event-App für Android, entwickelt mit React (Vite) und einem Express.js-Backend mit SQLite-Datenbank.
 
-## Projektübersicht
+---
 
-- Framework: React mit Vite
-- Styling: Tailwind CSS / shadcn UI Komponenten
-- Paketmanager: pnpm (verwendet durch `pnpm-workspace.yaml`)
-- Ziel: lokale Entwicklung und schnelle Vorschau im Browser
+## Projektstruktur
+
+```
+meetngo/
+├── frontend/                   # React/Vite App (Android UI)
+│   ├── src/
+│   │   ├── api/                # API-Client und Service-Funktionen
+│   │   │   ├── client.ts       # Fetch-Wrapper mit JWT-Authentifizierung
+│   │   │   ├── auth.ts         # login(), register()
+│   │   │   └── events.ts       # CRUD-Operationen für Events
+│   │   ├── app/
+│   │   │   ├── components/     # Wiederverwendbare UI-Komponenten
+│   │   │   └── screens/        # App-Screens (Login, Map, Search, …)
+│   │   ├── context/
+│   │   │   └── AuthContext.tsx # Globaler Auth-State (JWT + User)
+│   │   └── main.tsx
+│   ├── index.html
+│   ├── vite.config.ts          # Vite + Proxy zu Backend (Port 3001)
+│   └── package.json
+│
+├── backend/                    # Express.js REST-API
+│   ├── server.js               # Einstiegspunkt (Port 3001)
+│   ├── database.js             # SQLite via better-sqlite3 + Seed-Daten
+│   ├── routes/
+│   │   ├── auth.js             # POST /api/auth/register, /api/auth/login
+│   │   └── events.js           # GET/POST/DELETE /api/events
+│   ├── uploads/                # Hochgeladene Event-Bilder (gitignored)
+│   └── package.json
+│
+├── guidelines/                 # Design-Guidelines aus Figma
+├── pnpm-workspace.yaml         # pnpm Monorepo-Konfiguration
+├── package.json                # Root-Skripte (dev, build, …)
+└── .gitignore
+```
+
+---
 
 ## Voraussetzungen
 
-- Node.js 18 oder neuer
-- Git installiert, wenn du das Projekt versionieren möchtest
-- Optional: pnpm installiert (`npm install -g pnpm`), wenn du lieber pnpm nutzen willst
+- **Node.js** 18 oder neuer
+- **pnpm** (empfohlen): `npm install -g pnpm`
 
-## Lokaler Start
+---
 
-1. Abhängigkeiten installieren:
+## Installation
 
-Mit npm:
 ```bash
+# 1. Root-Abhängigkeiten installieren (concurrently)
 npm install
+
+# 2. Frontend-Abhängigkeiten installieren
+cd frontend && npm install && cd ..
+
+# 3. Backend-Abhängigkeiten installieren
+cd backend && npm install && cd ..
 ```
 
-Alternativ mit pnpm:
-```bash
-pnpm install
-```
+---
 
-2. Entwicklungsserver starten:
+## Starten
 
-Mit npm:
+### Beide gleichzeitig (empfohlen)
+
 ```bash
 npm run dev
 ```
 
-Alternativ mit pnpm:
+Dies startet Backend (Port 3001) und Frontend (Port 5173) gleichzeitig.
+
+### Einzeln starten
+
 ```bash
-pnpm dev
+# Nur Backend
+npm run dev:backend
+# oder
+cd backend && node --watch server.js
+
+# Nur Frontend
+npm run dev:frontend
+# oder
+cd frontend && npm run dev
 ```
 
-> `npm` ist der Standard-Paketmanager für Node.js und funktioniert hier genauso wie `pnpm`. `pnpm` ist nur ein schnelleres, speicherplatzsparendes Tool. Du kannst also einfach `npm install` nutzen.
+Öffne anschließend `http://localhost:5173` im Browser.
 
-3. Öffne die angezeigte URL im Browser (standardmäßig `http://localhost:5173`)
+---
 
-## Nützliche Befehle
+## API-Übersicht
 
-- `pnpm dev` – Startet den lokalen Entwicklungsserver
-- `pnpm build` – Erstellt das Produktions-Build
+Das Backend läuft auf `http://localhost:3001`. Vite proxied automatisch alle `/api` und `/uploads` Anfragen dorthin.
 
-## Figma-Quelle
+| Methode | Endpoint | Beschreibung |
+|--------|----------|-------------|
+| POST | `/api/auth/register` | Neues Konto erstellen |
+| POST | `/api/auth/login` | Einloggen, gibt JWT zurück |
+| GET | `/api/events` | Events abrufen (mit Filter/Sort) |
+| GET | `/api/events/:id` | Ein Event abrufen |
+| POST | `/api/events` | Event erstellen (Auth + Bild-Upload) |
+| DELETE | `/api/events/:id` | Event löschen (nur Ersteller) |
 
-Das Design basiert auf dem Figma-Projekt unter:
+### Filter-Parameter für `GET /api/events`
+
+| Parameter | Werte | Beschreibung |
+|-----------|-------|-------------|
+| `search` | Freitext | Sucht in Name, Ort, Beschreibung |
+| `category` | Musik, Sport, … | Kategorie-Filter |
+| `sort` | `date`, `name`, `attendees`, `price` | Sortierfeld |
+| `order` | `asc`, `desc` | Sortierreihenfolge |
+| `priceFilter` | `free`, `paid` | Kostenlos / Kostenpflichtig |
+
+---
+
+## Datenbank
+
+Die SQLite-Datenbank wird beim ersten Start automatisch unter `backend/meetngo.db` erstellt und mit Demo-Events befüllt. Die Datei ist in `.gitignore` eingetragen und wird **nicht** versioniert.
+
+Hochgeladene Event-Bilder werden unter `backend/uploads/` gespeichert und sind ebenfalls gitignored.
+
+---
+
+## Android-Build (Capacitor)
+
+Da die App mit React/Vite gebaut ist, kann sie über Capacitor als native Android-App verpackt werden:
+
+```bash
+cd frontend
+npm install @capacitor/core @capacitor/cli @capacitor/android
+npx cap init MeetNGo com.meetngo.app --web-dir dist
+npm run build
+npx cap add android
+npx cap open android
+```
+
+> Das Backend muss auf einem erreichbaren Server laufen. Die API-URL in `frontend/src/api/client.ts` muss für den Android-Build auf die Serveradresse angepasst werden (z.B. `http://192.168.1.x:3001`).
+
+---
+
+## Figma-Design
+
+Das UI-Design basiert auf dem Figma-Projekt:  
 https://www.figma.com/design/XFbfqoyFt7IFZrnVYUjUzJ/MeetNGo-Mobile-App-UI
-
-## Git-Vorbereitung
-
-Eine `.gitignore`-Datei wurde hinzugefügt, damit lokale Abhängigkeiten und temporäre Dateien nicht im Repository landen.
-
-Wenn du ein neues Git-Repository initialisieren möchtest, verwende:
-
-```bash
-git init
-git add .
-git commit -m "Initial commit: MeetNGo Mobile App UI"
-```

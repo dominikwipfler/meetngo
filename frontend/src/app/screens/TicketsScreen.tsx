@@ -1,13 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { QrCode, RefreshCw } from "lucide-react";
 import { Card } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Button } from "../components/ui/button";
-import { BottomNav } from "../components/BottomNav";
-import { AccessibilityButton } from "../components/AccessibilityButton";
 import { useNavigate } from "react-router";
-import { events } from "../data/events";
+import { getEvents, getImageUrl } from "../../api/events";
+import type { ApiEvent } from "../../api/events";
 
 interface Ticket {
   id: number;
@@ -26,6 +25,11 @@ const tickets: Ticket[] = [
 export function TicketsScreen() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("active");
+  const [apiEvents, setApiEvents] = useState<ApiEvent[]>([]);
+
+  useEffect(() => {
+    getEvents().then(setApiEvents).catch(() => {});
+  }, []);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { label: string; className: string }> = {
@@ -51,7 +55,7 @@ export function TicketsScreen() {
     return tickets
       .filter((ticket) => ticket.status === status)
       .map((ticket) => {
-        const event = events.find((e) => e.id === ticket.eventId);
+        const event = apiEvents.find((e) => e.id === ticket.eventId);
         return { ...ticket, event };
       })
       .filter((t) => t.event);
@@ -62,7 +66,7 @@ export function TicketsScreen() {
   const pastTickets = getTicketsByStatus("used");
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="flex-1 flex flex-col bg-background">
       <div className="sticky top-0 bg-card border-b border-border px-4 py-4 z-10">
         <h1>Meine Tickets</h1>
       </div>
@@ -86,8 +90,8 @@ export function TicketsScreen() {
                   <div
                     className="w-16 h-16 rounded-lg flex-shrink-0 bg-cover bg-center"
                     style={{
-                      backgroundImage: ticket.event?.imageUrl
-                        ? `url(${ticket.event.imageUrl})`
+                      backgroundImage: getImageUrl(ticket.event?.image_path ?? null)
+                        ? `url(${getImageUrl(ticket.event?.image_path ?? null)})`
                         : "linear-gradient(135deg, #1D9E75 0%, #D85A30 100%)",
                     }}
                   />
@@ -97,7 +101,7 @@ export function TicketsScreen() {
                       {getStatusBadge(ticket.status)}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {ticket.event?.date.split(",")[0]}
+                      {ticket.event?.date ? new Date(ticket.event.date).toLocaleDateString("de-DE") : ""}
                     </p>
                     <p className="text-sm text-muted-foreground truncate">
                       {ticket.event?.location}
@@ -140,8 +144,8 @@ export function TicketsScreen() {
                   <div
                     className="w-16 h-16 rounded-lg flex-shrink-0 bg-cover bg-center"
                     style={{
-                      backgroundImage: ticket.event?.imageUrl
-                        ? `url(${ticket.event.imageUrl})`
+                      backgroundImage: getImageUrl(ticket.event?.image_path ?? null)
+                        ? `url(${getImageUrl(ticket.event?.image_path ?? null)})`
                         : "linear-gradient(135deg, #1D9E75 0%, #D85A30 100%)",
                     }}
                   />
@@ -151,7 +155,7 @@ export function TicketsScreen() {
                       {getStatusBadge(ticket.status)}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {ticket.event?.date.split(",")[0]}
+                      {ticket.event?.date ? new Date(ticket.event.date).toLocaleDateString("de-DE") : ""}
                     </p>
                     <p className="text-sm text-muted-foreground truncate">
                       {ticket.event?.location}
@@ -179,8 +183,8 @@ export function TicketsScreen() {
                   <div
                     className="w-16 h-16 rounded-lg flex-shrink-0 bg-cover bg-center"
                     style={{
-                      backgroundImage: ticket.event?.imageUrl
-                        ? `url(${ticket.event.imageUrl})`
+                      backgroundImage: getImageUrl(ticket.event?.image_path ?? null)
+                        ? `url(${getImageUrl(ticket.event?.image_path ?? null)})`
                         : "linear-gradient(135deg, #1D9E75 0%, #D85A30 100%)",
                     }}
                   />
@@ -190,7 +194,7 @@ export function TicketsScreen() {
                       {getStatusBadge(ticket.status)}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {ticket.event?.date.split(",")[0]}
+                      {ticket.event?.date ? new Date(ticket.event.date).toLocaleDateString("de-DE") : ""}
                     </p>
                     <p className="text-sm text-muted-foreground truncate">
                       {ticket.event?.location}
@@ -208,8 +212,6 @@ export function TicketsScreen() {
         </Tabs>
       </div>
 
-      <BottomNav />
-      <AccessibilityButton />
     </div>
   );
 }
