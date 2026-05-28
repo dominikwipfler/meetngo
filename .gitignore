@@ -16,6 +16,8 @@ frontend/.vite/
 
 # SQLite database (contains user data — do not commit)
 backend/meetngo.db
+backend/meetngo.db-shm
+backend/meetngo.db-wal
 
 # Uploaded event images (user content — do not commit)
 backend/uploads/*
