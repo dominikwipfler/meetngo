@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { QrCode, RefreshCw } from "lucide-react";
+import { QrCode, RefreshCw, X } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Card } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -22,10 +23,53 @@ const tickets: Ticket[] = [
   { id: 4, eventId: 2, status: "used" },
 ];
 
+interface QrModalProps {
+  ticket: (Ticket & { event?: ApiEvent }) | null;
+  onClose: () => void;
+}
+
+function QrModal({ ticket, onClose }: QrModalProps) {
+  if (!ticket) return null;
+
+  const qrValue = JSON.stringify({ ticketId: ticket.id, eventId: ticket.eventId });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card rounded-2xl p-6 mx-4 w-full max-w-sm flex flex-col items-center gap-4 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between w-full">
+          <h2 className="text-lg font-semibold">Dein Ticket</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl">
+          <QRCodeSVG value={qrValue} size={220} />
+        </div>
+
+        <div className="text-center">
+          <p className="font-medium">{ticket.event?.name}</p>
+          <p className="text-sm text-muted-foreground">
+            {ticket.event?.date ? new Date(ticket.event.date).toLocaleDateString("de-DE") : ""}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">Ticket #{ticket.id}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TicketsScreen() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("active");
   const [apiEvents, setApiEvents] = useState<ApiEvent[]>([]);
+  const [qrTicket, setQrTicket] = useState<(Ticket & { event?: ApiEvent }) | null>(null);
 
   useEffect(() => {
     getEvents().then(setApiEvents).catch(() => {});
@@ -67,6 +111,8 @@ export function TicketsScreen() {
 
   return (
     <div className="flex-1 flex flex-col bg-background">
+      <QrModal ticket={qrTicket} onClose={() => setQrTicket(null)} />
+
       <div className="sticky top-0 bg-card border-b border-border px-4 py-4 z-10">
         <h1>Meine Tickets</h1>
       </div>
@@ -113,7 +159,10 @@ export function TicketsScreen() {
                     variant="outline"
                     size="sm"
                     className="flex-1 gap-2"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setQrTicket(ticket);
+                    }}
                   >
                     <QrCode className="w-4 h-4" />
                     QR-Code
@@ -211,7 +260,6 @@ export function TicketsScreen() {
           </TabsContent>
         </Tabs>
       </div>
-
     </div>
   );
 }
