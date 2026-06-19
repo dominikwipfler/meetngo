@@ -77,6 +77,10 @@ Die Vorgaben verlangten fünf Kernfunktionen plus gutes Design. Umgesetzt wurde 
 - **JWT-Auth zentral über eine gemeinsame Middleware** (`backend/middleware/auth.js`) — jede geschützte Route prüft den Token identisch, statt die Logik mehrfach zu duplizieren.
 - **Profil-Updates mit echter Konfliktbehandlung**: Ändert ein Nutzer Benutzername oder E-Mail auf einen bereits vergebenen Wert, fängt das Backend den `UNIQUE constraint`-Fehler der Datenbank ab und antwortet mit einer verständlichen `409`-Fehlermeldung statt eines rohen SQL-Fehlers oder eines stillen Fehlschlags.
 - **Validierte Datei-Uploads**: Bild-Uploads werden client- *und* serverseitig auf Dateityp (JPG/PNG/WebP) und Größe (max. 5 MB) geprüft. Ein dokumentierter Workaround für ein bekanntes Verhalten von `multer@1.x` (ein per `cb(error)` abgelehnter Dateifilter kann den Request hängen lassen) sorgt dafür, dass fehlerhafte Uploads zuverlässig als JSON-Fehler statt als hängende Verbindung oder Express-HTML-Fehlerseite beim Client ankommen (`backend/routes/events.js`).
+- **Berechtigungsprüfung beim Löschen**: Nur der Ersteller eines Events darf es löschen (`organizer_id`-Abgleich gegen den eingeloggten Nutzer) — jeder andere Versuch wird mit `403 Forbidden` abgelehnt.
+- **Keine verwaisten Dateien**: Schlägt die Validierung beim Event-Erstellen fehl, wird ein bereits hochgeladenes Bild sofort wieder von der Platte gelöscht; löscht ein Veranstalter sein Event, wird auch das zugehörige Bild entfernt — `backend/uploads/` sammelt dadurch keine verwaisten Dateien an.
+- **Sicherer Fallback für `JWT_SECRET`**: Fehlt die Umgebungsvariable, startet der Server trotzdem (praktisch für schnelles lokales Ausprobieren), gibt dabei aber eine deutliche Konsolen-Warnung aus, statt unbemerkt mit einem unsicheren Default-Schlüssel weiterzulaufen (`backend/server.js`).
+- **Robuste Session-Wiederherstellung**: Der `AuthContext` lädt Token und Nutzerdaten beim App-Start aus `localStorage`; ist der gespeicherte Zustand beschädigt oder fehlerhaft, wird er automatisch verworfen statt die App mit einem unbehandelten Fehler abstürzen zu lassen.
 
 #### 🗄️ Datenbankdesign nach Lehrbuch
 
@@ -90,6 +94,7 @@ Die Vorgaben verlangten fünf Kernfunktionen plus gutes Design. Umgesetzt wurde 
 - **68 automatisierte Tests**: 49 Backend-Tests (`auth`, `events`, `tickets`, `users`, `price`) mit Vitest + Supertest gegen eine isolierte In-Memory-SQLite-Datenbank, die nie die lokale `meetngo.db` berührt; 19 Frontend-Tests (API-Client, Events, Tickets, `AuthContext`) mit Vitest + React Testing Library.
 - **GitHub-Actions-CI-Pipeline** (`.github/workflows/ci.yml`): Jeder Push und Pull Request durchläuft automatisch Install → Lint → Typecheck → Test → Build — schlägt einer dieser Schritte fehl, ist das in der PR sofort sichtbar, bevor fehlerhafter Code in `master` landet.
 - **TypeScript im `strict`-Modus** für das gesamte Frontend, **ESLint + Prettier** für Frontend und Backend mit einheitlicher Konfiguration.
+- **Saubere Lizenzangaben**: Verwendete Drittanbieter-Komponenten und -Bilder (shadcn/ui, Unsplash) sind mit Quelle und Lizenz in [`frontend/ATTRIBUTIONS.md`](frontend/ATTRIBUTIONS.md) dokumentiert.
 
 #### 📱 Mobile-UX-Details, die über "sieht gut aus" hinausgehen
 
