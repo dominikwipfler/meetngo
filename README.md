@@ -62,20 +62,46 @@ Eine mobile Event-Discovery-App für Android: Events auf einer interaktiven Kart
 
 ### Extras über die Vorgaben hinaus
 
-Funktionen und Qualitätsmerkmale, die zusätzlich zu den genannten Pflicht-Features umgesetzt wurden:
+Die Vorgaben verlangten fünf Kernfunktionen plus gutes Design. Umgesetzt wurde stattdessen eine **vollständige, produktionsnahe Anwendung** mit echtem Backend, persistenter Datenhaltung, automatisierten Tests und CI/CD — kein Mock-Datensatz im Frontend, sondern eine REST-API mit eigener Datenbank, die alle Geschäftsregeln serverseitig durchsetzt.
 
-- **Echtes Ticket-System** — Tickets werden serverseitig in einer eigenen `tickets`-Tabelle angelegt (nicht nur simuliert), Kapazitätsgrenzen werden geprüft (`409`, wenn ein Event ausverkauft ist), Kauf + Teilnehmerzähler laufen atomar in einer SQLite-Transaktion
-- **QR-Code pro Ticket** — jedes gekaufte Ticket erzeugt einen echten, scanbaren QR-Code, clientseitig gerendert ohne externen Dienst
-- **Organizer-Dashboard** — eigene Events verwalten, Statistiken zu Teilnehmerzahlen einsehen
-- **Profil dauerhaft speicherbar** — Benutzername, E-Mail und Interessen werden serverseitig gespeichert (`PATCH /api/users/me`), inklusive Eindeutigkeitsprüfung (`409` bei bereits vergebenem Namen/Mail) statt nur im lokalen UI-State
-- **Barrierefreiheits-Menü** — Dark Mode und Hoch-Kontrast-Modus jederzeit über ein eigenes Menü erreichbar
-- **Saubere Datenbankarchitektur** — normalisiertes Schema mit Fremdschlüsselbeziehungen (`events.organizer_id → users.id`, `tickets.event_id → events.id`, `tickets.user_id → users.id`); Preise zusätzlich als numerische `price_value`-Spalte für korrekte Sortierung (ein reiner Textvergleich würde z. B. `"100,00"` vor `"29,00"` einordnen)
-- **Automatisierte Test-Suite** — 68 automatisierte Tests (49 Backend mit Vitest/Supertest gegen eine isolierte In-Memory-DB, 19 Frontend mit Vitest/React Testing Library)
-- **CI/CD-Pipeline** — GitHub Actions führt bei jedem Push/PR automatisch Lint → Typecheck → Test → Build aus
-- **Codequalität-Tooling** — ESLint, Prettier und TypeScript im `strict`-Modus für das gesamte Projekt
-- **Sichere Authentifizierung** — Passwörter werden mit bcrypt gehasht, niemals im Klartext gespeichert; JWT-Auth zentral über eine gemeinsame Middleware geprüft
-- **Validierte Datei-Uploads** — Bild-Uploads werden sowohl client- als auch serverseitig auf Dateityp und Größe geprüft, fehlerhafte Uploads werden mit klarer Fehlermeldung abgelehnt
-- **Android-Build vorbereitet** — die App lässt sich über Capacitor als native Android-App verpacken (siehe [Android-Build](#android-build-capacitor))
+#### 🎟️ Echtes Ticket-System statt Simulation
+
+- Tickets sind keine reine UI-Animation, sondern werden serverseitig in einer eigenen `tickets`-Tabelle angelegt, per Fremdschlüssel an Event *und* Käufer gebunden.
+- **Kapazitätsprüfung mit Race-Condition-Schutz**: Ein Kauf-Versuch für ein ausgebuchtes Event wird mit `409 Conflict` abgelehnt (`backend/routes/tickets.js`). Insert des Tickets *und* Hochzählen von `events.attendees` laufen dabei in einer einzigen `db.transaction(...)` — würde man das stattdessen als zwei separate Schreibzugriffe ausführen, könnten bei (fast) gleichzeitigen Käufen mehr Tickets verkauft werden als Plätze vorhanden sind. Die Transaktion macht den Kauf atomar.
+- **Echte, scanbare QR-Codes** pro Ticket — clientseitig generiert, kein externer Dienst, kein API-Limit.
+- **Organizer-Dashboard**: Veranstalter sehen Teilnehmerzahlen, Kapazitätsauslastung und Einnahmen ihrer eigenen Events live aus der Datenbank, nicht aus statischen Werten.
+
+#### 🔐 Sicherheit, die über "Login klappt" hinausgeht
+
+- Passwörter werden mit **bcrypt** gehasht (nie im Klartext gespeichert), Login/Registrierung über `POST /api/auth/*`.
+- **JWT-Auth zentral über eine gemeinsame Middleware** (`backend/middleware/auth.js`) — jede geschützte Route prüft den Token identisch, statt die Logik mehrfach zu duplizieren.
+- **Profil-Updates mit echter Konfliktbehandlung**: Ändert ein Nutzer Benutzername oder E-Mail auf einen bereits vergebenen Wert, fängt das Backend den `UNIQUE constraint`-Fehler der Datenbank ab und antwortet mit einer verständlichen `409`-Fehlermeldung statt eines rohen SQL-Fehlers oder eines stillen Fehlschlags.
+- **Validierte Datei-Uploads**: Bild-Uploads werden client- *und* serverseitig auf Dateityp (JPG/PNG/WebP) und Größe (max. 5 MB) geprüft. Ein dokumentierter Workaround für ein bekanntes Verhalten von `multer@1.x` (ein per `cb(error)` abgelehnter Dateifilter kann den Request hängen lassen) sorgt dafür, dass fehlerhafte Uploads zuverlässig als JSON-Fehler statt als hängende Verbindung oder Express-HTML-Fehlerseite beim Client ankommen (`backend/routes/events.js`).
+
+#### 🗄️ Datenbankdesign nach Lehrbuch
+
+- **Normalisiertes Schema** mit drei Tabellen (`users`, `events`, `tickets`) und expliziten Fremdschlüsselbeziehungen entlang der 1:n-Kardinalitäten (`events.organizer_id → users.id`, `tickets.event_id → events.id`, `tickets.user_id → users.id`) statt redundanter, eingebetteter Daten.
+- **Fremdschlüssel-Constraints tatsächlich aktiv** — `PRAGMA foreign_keys = ON` wird explizit gesetzt; SQLite erzwingt referentielle Integrität standardmäßig *nicht*, dieser Schritt wird in der Praxis häufig vergessen.
+- **Bewusster Kompromiss bei der Preis-Spalte**: Preise werden als lesbarer Anzeige-String gespeichert (`"29,00"`, `"Kostenlos"`), zusätzlich aber als numerischer Wert in `price_value` dupliziert. Grund: Ein `ORDER BY` auf der reinen Text-Spalte würde lexikographisch sortieren — `"100,00"` käme vor `"29,00"`, weil `"1" < "2"` als Zeichen gilt. Die zusätzliche numerische Spalte ist eine bewusste, kommentierte Abweichung von strikter Normalisierung zugunsten korrekter Sortierung (`backend/utils/price.js`).
+- **Abwärtskompatible Schema-Migrationen**: Wird die App auf einer bereits existierenden, älteren Datenbank gestartet (z. B. ohne die Spalten `price_value` oder `interests`), erkennt `backend/database.js` das über `PRAGMA table_info` und ergänzt die fehlenden Spalten samt Backfill der vorhandenen Zeilen — statt die Datenbank zu löschen und neu zu erzeugen, was im Betrieb Datenverlust bedeuten würde.
+
+#### ✅ Qualitätssicherung, wie sie in echten Projekten verlangt wird
+
+- **68 automatisierte Tests**: 49 Backend-Tests (`auth`, `events`, `tickets`, `users`, `price`) mit Vitest + Supertest gegen eine isolierte In-Memory-SQLite-Datenbank, die nie die lokale `meetngo.db` berührt; 19 Frontend-Tests (API-Client, Events, Tickets, `AuthContext`) mit Vitest + React Testing Library.
+- **GitHub-Actions-CI-Pipeline** (`.github/workflows/ci.yml`): Jeder Push und Pull Request durchläuft automatisch Install → Lint → Typecheck → Test → Build — schlägt einer dieser Schritte fehl, ist das in der PR sofort sichtbar, bevor fehlerhafter Code in `master` landet.
+- **TypeScript im `strict`-Modus** für das gesamte Frontend, **ESLint + Prettier** für Frontend und Backend mit einheitlicher Konfiguration.
+
+#### 📱 Mobile-UX-Details, die über "sieht gut aus" hinausgehen
+
+- **Durchgängig ≥44×44px große Touch-Targets** (Android-Design-Richtlinie für sichere Daumenbedienung), konsequent auch bei Icon-Buttons in Headern und Floating-Buttons.
+- **Bestätigungsdialoge gezielt nur bei kritischen/destruktiven Aktionen** (Logout, Event löschen), nicht bei jedem Tap — vermeidet "Dialog-Müdigkeit" und unnötige Reibung.
+- **Sichtbares Feedback bei jeder Interaktion**: Lade- und Fehlerzustände statt stiller Wartezeiten, z. B. "Speichern…" während des Profil-Updates oder klare Fehlertexte bei fehlgeschlagenem Login.
+- **Barrierefreiheits-Menü** mit Dark Mode und Hoch-Kontrast-Modus, jederzeit über einen fixen Button erreichbar, unabhängig vom aktuellen Screen.
+- **Bottom-Navigation** für einhändige Bedienung auf großen Smartphone-Displays statt einer oberen Navigationsleiste.
+
+#### 📦 Android-Build vorbereitet
+
+Die App lässt sich über Capacitor direkt als native Android-App verpacken, ohne den React-Code umzuschreiben (siehe [Android-Build](#android-build-capacitor)).
 
 ## Tech-Stack
 

@@ -3,10 +3,12 @@ import { Settings } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Switch } from "./ui/switch";
 import { Label } from "./ui/label";
+import { useHighContrast } from "../../context/HighContrastContext";
 
 export function AccessibilityButton() {
   const [showMenu, setShowMenu] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { highContrast, setHighContrast } = useHighContrast();
 
   return (
     <>
@@ -34,7 +36,11 @@ export function AccessibilityButton() {
               </div>
               <div className="flex items-center justify-between">
                 <Label htmlFor="high-contrast">Hoher Kontrast</Label>
-                <Switch id="high-contrast" />
+                <Switch
+                  id="high-contrast"
+                  checked={highContrast}
+                  onCheckedChange={setHighContrast}
+                />
               </div>
             </div>
           </div>

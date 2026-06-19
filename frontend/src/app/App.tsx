@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import type { ReactNode } from "react";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider, useAuth } from "../context/AuthContext";
+import { HighContrastProvider } from "../context/HighContrastContext";
 import { BottomNav } from "./components/BottomNav";
 import { AccessibilityButton } from "./components/AccessibilityButton";
 import { LoginScreen } from "./screens/LoginScreen";
@@ -171,9 +172,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <HighContrastProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </HighContrastProvider>
     </ThemeProvider>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from "../components/ui/accordion";
 import { Switch } from "../components/ui/switch";
 import { useAuth } from "../../context/AuthContext";
+import { useHighContrast } from "../../context/HighContrastContext";
 import { getMyProfile, updateProfile } from "../../api/users";
 
 const availableInterests = [
@@ -33,7 +34,7 @@ export function ProfileSettingsScreen() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { updateUser } = useAuth();
-  const [highContrast, setHighContrast] = useState(false);
+  const { highContrast, setHighContrast } = useHighContrast();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
