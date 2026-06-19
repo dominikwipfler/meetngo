@@ -3,17 +3,27 @@
   "version": "1.0.0",
   "private": true,
   "description": "MeetNGo – Event-App für Android (Monorepo)",
+  "packageManager": "pnpm@10.33.2",
   "scripts": {
     "dev": "concurrently \"pnpm --filter backend dev\" \"pnpm --filter frontend dev\"",
     "dev:frontend": "pnpm --filter frontend dev",
     "dev:backend": "pnpm --filter backend dev",
     "build": "pnpm --filter frontend build",
-    "install:all": "pnpm install"
+    "install:all": "pnpm install",
+    "lint": "pnpm --filter frontend lint && pnpm --filter backend lint",
+    "lint:fix": "pnpm --filter frontend lint:fix && pnpm --filter backend lint:fix",
+    "format": "pnpm --filter frontend format && pnpm --filter backend format",
+    "typecheck": "pnpm --filter frontend typecheck",
+    "test": "pnpm --filter frontend test && pnpm --filter backend test"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^10.0.3"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3", "@tailwindcss/oxide", "esbuild"]
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "@tailwindcss/oxide",
+      "esbuild"
+    ]
   }
 }

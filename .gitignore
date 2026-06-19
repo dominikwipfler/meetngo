@@ -13,6 +13,7 @@ dist/
 frontend/dist/
 .vite/
 frontend/.vite/
+*.tsbuildinfo
 
 # SQLite database (contains user data — do not commit)
 backend/meetngo.db
@@ -30,6 +31,9 @@ frontend/.env
 frontend/.env.*
 backend/.env
 backend/.env.*
+!.env.example
+!frontend/.env.example
+!backend/.env.example
 
 # Logs
 npm-debug.log*
@@ -40,6 +44,7 @@ pnpm-debug.log*
 # Editor directories and files
 .vscode/
 .idea/
+.claude/
 *.suo
 *.ntvs*
 *.njsproj

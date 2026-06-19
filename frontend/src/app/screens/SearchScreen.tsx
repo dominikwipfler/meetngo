@@ -65,11 +65,9 @@ export function SearchScreen() {
     return () => clearTimeout(timer);
   }, [fetchEvents]);
 
-  const activeFilterCount = [
-    priceFilter !== "",
-    sort !== "date",
-    order !== "asc",
-  ].filter(Boolean).length;
+  const activeFilterCount = [priceFilter !== "", sort !== "date", order !== "asc"].filter(
+    Boolean,
+  ).length;
 
   return (
     <div className="flex-1 flex flex-col bg-background">
@@ -131,7 +129,9 @@ export function SearchScreen() {
 
       <div className="p-4">
         <p className="text-sm text-muted-foreground mb-4">
-          {loading ? "Suche..." : `${events.length} Event${events.length !== 1 ? "s" : ""} gefunden`}
+          {loading
+            ? "Suche..."
+            : `${events.length} Event${events.length !== 1 ? "s" : ""} gefunden`}
         </p>
 
         <div className="space-y-3">
@@ -224,9 +224,7 @@ export function SearchScreen() {
                 <button
                   onClick={() => setOrder("asc")}
                   className={`p-3 rounded-lg border text-sm font-medium transition-colors ${
-                    order === "asc"
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border"
+                    order === "asc" ? "border-primary bg-primary/10 text-primary" : "border-border"
                   }`}
                 >
                   Aufsteigend ↑
@@ -234,9 +232,7 @@ export function SearchScreen() {
                 <button
                   onClick={() => setOrder("desc")}
                   className={`p-3 rounded-lg border text-sm font-medium transition-colors ${
-                    order === "desc"
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border"
+                    order === "desc" ? "border-primary bg-primary/10 text-primary" : "border-border"
                   }`}
                 >
                   Absteigend ↓
@@ -289,7 +285,6 @@ export function SearchScreen() {
           </div>
         </SheetContent>
       </Sheet>
-
     </div>
   );
 }

@@ -41,9 +41,7 @@ export function LoginScreen() {
             <span className="text-3xl text-primary-foreground">M&G</span>
           </div>
           <h1 className="text-3xl">MeetNGo</h1>
-          <p className="text-muted-foreground mt-2">
-            Entdecke Events in deiner Nähe
-          </p>
+          <p className="text-muted-foreground mt-2">Entdecke Events in deiner Nähe</p>
         </div>
 
         <div className="space-y-4">
@@ -73,9 +71,7 @@ export function LoginScreen() {
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive text-center">{error}</p>
-          )}
+          {error && <p className="text-sm text-destructive text-center">{error}</p>}
 
           <Button
             onClick={handleLogin}

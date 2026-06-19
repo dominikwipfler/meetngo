@@ -6,10 +6,10 @@ export function BottomNav() {
   const location = useLocation();
 
   const navItems = [
-    { icon: Map,    label: "Karte",   path: "/map" },
-    { icon: Search, label: "Suche",   path: "/search" },
+    { icon: Map, label: "Karte", path: "/map" },
+    { icon: Search, label: "Suche", path: "/search" },
     { icon: Ticket, label: "Tickets", path: "/tickets" },
-    { icon: User,   label: "Profil",  path: "/profile" },
+    { icon: User, label: "Profil", path: "/profile" },
   ];
 
   return (

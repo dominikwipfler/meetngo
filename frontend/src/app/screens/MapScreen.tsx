@@ -13,8 +13,12 @@ const CATEGORIES = ["Musik", "Sport", "Kunst", "Food", "Tech", "Outdoor"];
 const CENTER: [number, number] = [49.0069, 8.4037];
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Musik: "#6366f1", Sport: "#22c55e", Food: "#f97316",
-  Tech: "#0ea5e9", Kunst: "#ec4899", Outdoor: "#84cc16",
+  Musik: "#6366f1",
+  Sport: "#22c55e",
+  Food: "#f97316",
+  Tech: "#0ea5e9",
+  Kunst: "#ec4899",
+  Outdoor: "#84cc16",
   Sonstiges: "#1D9E75",
 };
 
@@ -49,11 +53,13 @@ export function MapScreen() {
   const [selectedEvent, setSelectedEvent] = useState<ApiEvent | null>(null);
 
   useEffect(() => {
-    getEvents({ sort: "date", order: "asc" }).then(setAllEvents).catch(() => {});
+    getEvents({ sort: "date", order: "asc" })
+      .then(setAllEvents)
+      .catch(() => {});
   }, []);
 
   const toggleFilter = (f: string) =>
-    setActiveFilters((prev) => prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]);
+    setActiveFilters((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]));
 
   const filtered = allEvents.filter((e) => {
     const q = searchQuery.toLowerCase();
@@ -65,7 +71,6 @@ export function MapScreen() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 relative">
-
       {/* ── Karte ── */}
       <MapContainer
         center={CENTER}
@@ -96,7 +101,13 @@ export function MapScreen() {
                   <img
                     src={getImageUrl(event.image_path) ?? ""}
                     alt={event.name}
-                    style={{ width: "100%", height: 72, objectFit: "cover", borderRadius: 6, marginBottom: 6 }}
+                    style={{
+                      width: "100%",
+                      height: 72,
+                      objectFit: "cover",
+                      borderRadius: 6,
+                      marginBottom: 6,
+                    }}
                   />
                 )}
                 <p style={{ fontWeight: 700, fontSize: 13, margin: "0 0 2px" }}>{event.name}</p>
@@ -128,7 +139,9 @@ export function MapScreen() {
               key={f}
               variant={activeFilters.includes(f) ? "default" : "outline"}
               className={`cursor-pointer whitespace-nowrap px-3 py-1.5 text-xs shadow ${
-                activeFilters.includes(f) ? "bg-primary text-primary-foreground" : "bg-card/95 backdrop-blur"
+                activeFilters.includes(f)
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card/95 backdrop-blur"
               }`}
               onClick={() => toggleFilter(f)}
             >

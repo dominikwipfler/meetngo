@@ -4,7 +4,16 @@ import { ArrowLeft, Edit, Star, XCircle, Trash2, QrCode, TrendingUp } from "luci
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 import { getEvents, deleteEvent, getImageUrl } from "../../api/events";
 import type { ApiEvent } from "../../api/events";
 import { useAuth } from "../../context/AuthContext";
@@ -17,17 +26,27 @@ export function OrganizerDashboardScreen() {
   const [selectedEvent, setSelectedEvent] = useState<ApiEvent | null>(null);
 
   useEffect(() => {
-    getEvents().then((data) => {
-      const mine = data.filter((e) => e.organizer_id === user?.id);
-      setMyEvents(mine);
-      if (mine.length > 0) setSelectedEvent(mine[0]);
-    }).catch(() => {});
+    getEvents()
+      .then((data) => {
+        const mine = data.filter((e) => e.organizer_id === user?.id);
+        setMyEvents(mine);
+        if (mine.length > 0) setSelectedEvent(mine[0]);
+      })
+      .catch(() => {});
   }, [user?.id]);
 
   const stats = [
     { label: "Teilnehmer", value: String(selectedEvent?.attendees ?? 0), icon: TrendingUp },
-    { label: "Kapazität", value: selectedEvent?.capacity ? String(selectedEvent.capacity) : "∞", icon: TrendingUp },
-    { label: "Preis", value: selectedEvent?.price === "Kostenlos" ? "Frei" : `${selectedEvent?.price}€`, icon: TrendingUp },
+    {
+      label: "Kapazität",
+      value: selectedEvent?.capacity ? String(selectedEvent.capacity) : "∞",
+      icon: TrendingUp,
+    },
+    {
+      label: "Preis",
+      value: selectedEvent?.price === "Kostenlos" ? "Frei" : `${selectedEvent?.price}€`,
+      icon: TrendingUp,
+    },
   ];
 
   const handleDelete = async () => {
@@ -45,14 +64,20 @@ export function OrganizerDashboardScreen() {
     return (
       <div className="bg-background pb-6">
         <div className="sticky top-0 bg-card border-b border-border px-4 py-4 flex items-center gap-4 z-10">
-          <button onClick={() => navigate(-1)} className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-2">
+          <button
+            onClick={() => navigate(-1)}
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-2"
+          >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1>Event Dashboard</h1>
         </div>
         <div className="flex flex-col items-center justify-center p-8 mt-12 space-y-4">
           <p className="text-muted-foreground text-center">Du hast noch keine Events erstellt.</p>
-          <Button onClick={() => navigate("/create-event")} className="bg-accent hover:bg-accent/90">
+          <Button
+            onClick={() => navigate("/create-event")}
+            className="bg-accent hover:bg-accent/90"
+          >
             Event erstellen
           </Button>
         </div>

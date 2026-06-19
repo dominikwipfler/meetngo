@@ -109,9 +109,7 @@ export function CreateEventScreen() {
               className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors"
             >
               <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground text-center">
-                Bild hochladen (max. 5MB)
-              </p>
+              <p className="text-sm text-muted-foreground text-center">Bild hochladen (max. 5MB)</p>
               <p className="text-xs text-muted-foreground mt-1">
                 JPG, PNG oder WebP — wird in <code>/backend/uploads/</code> gespeichert
               </p>
@@ -201,9 +199,7 @@ export function CreateEventScreen() {
               onChange={(e) => setPrice(e.target.value)}
               className="h-12"
             />
-            <p className="text-xs text-muted-foreground">
-              Leer lassen für kostenloses Event
-            </p>
+            <p className="text-xs text-muted-foreground">Leer lassen für kostenloses Event</p>
           </div>
 
           <div className="space-y-2">
@@ -222,20 +218,12 @@ export function CreateEventScreen() {
         <div className="flex items-center justify-between p-4 border border-border rounded-lg">
           <div>
             <Label htmlFor="featured">Event hervorheben</Label>
-            <p className="text-sm text-muted-foreground">
-              Mehr Sichtbarkeit für dein Event
-            </p>
+            <p className="text-sm text-muted-foreground">Mehr Sichtbarkeit für dein Event</p>
           </div>
-          <Switch
-            id="featured"
-            checked={featured}
-            onCheckedChange={setFeatured}
-          />
+          <Switch id="featured" checked={featured} onCheckedChange={setFeatured} />
         </div>
 
-        {error && (
-          <p className="text-sm text-destructive text-center">{error}</p>
-        )}
+        {error && <p className="text-sm text-destructive text-center">{error}</p>}
 
         <Button
           onClick={handlePublish}
@@ -245,7 +233,6 @@ export function CreateEventScreen() {
           {loading ? "Wird veröffentlicht..." : "Veröffentlichen"}
         </Button>
       </div>
-
     </div>
   );
 }

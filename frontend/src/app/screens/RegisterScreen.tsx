@@ -61,9 +61,7 @@ export function RegisterScreen() {
             <span className="text-2xl text-primary-foreground">M&G</span>
           </div>
           <h1 className="text-2xl">Konto erstellen</h1>
-          <p className="text-muted-foreground mt-2 text-sm">
-            Werde Teil der MeetNGo-Community
-          </p>
+          <p className="text-muted-foreground mt-2 text-sm">Werde Teil der MeetNGo-Community</p>
         </div>
 
         <div className="space-y-4">
@@ -116,9 +114,7 @@ export function RegisterScreen() {
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive text-center">{error}</p>
-          )}
+          {error && <p className="text-sm text-destructive text-center">{error}</p>}
 
           <Button
             onClick={handleRegister}

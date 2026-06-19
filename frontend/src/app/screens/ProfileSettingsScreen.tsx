@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -6,8 +6,16 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "../components/ui/accordion";
 import { Switch } from "../components/ui/switch";
+import { useAuth } from "../../context/AuthContext";
+import { getMyProfile, updateProfile } from "../../api/users";
+
 const availableInterests = [
   "Musik",
   "Sport",
@@ -24,28 +32,44 @@ const availableInterests = [
 export function ProfileSettingsScreen() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
+  const { updateUser } = useAuth();
   const [highContrast, setHighContrast] = useState(false);
-  const [username, setUsername] = useState("maxmustermann");
-  const [email, setEmail] = useState("max@example.com");
-  const [selectedInterests, setSelectedInterests] = useState([
-    "Musik",
-    "Sport",
-    "Kunst",
-    "Food",
-    "Tech",
-    "Outdoor",
-  ]);
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    getMyProfile()
+      .then((profile) => {
+        setUsername(profile.username);
+        setEmail(profile.email);
+        setSelectedInterests(profile.interests);
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Profil konnte nicht geladen werden");
+      });
+  }, []);
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests((prev) =>
-      prev.includes(interest)
-        ? prev.filter((i) => i !== interest)
-        : [...prev, interest]
+      prev.includes(interest) ? prev.filter((i) => i !== interest) : [...prev, interest],
     );
   };
 
-  const handleSave = () => {
-    navigate("/profile");
+  const handleSave = async () => {
+    setError("");
+    setSaving(true);
+    try {
+      const updated = await updateProfile({ username, email, interests: selectedInterests });
+      updateUser(updated);
+      navigate("/profile");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -101,11 +125,7 @@ export function ProfileSettingsScreen() {
                   {availableInterests.map((interest) => (
                     <Badge
                       key={interest}
-                      variant={
-                        selectedInterests.includes(interest)
-                          ? "default"
-                          : "outline"
-                      }
+                      variant={selectedInterests.includes(interest) ? "default" : "outline"}
                       className={`cursor-pointer px-3 py-1 ${
                         selectedInterests.includes(interest)
                           ? "bg-primary text-primary-foreground"
@@ -137,9 +157,7 @@ export function ProfileSettingsScreen() {
             <div className="flex items-center justify-between p-4 border border-border rounded-lg">
               <div>
                 <p>Neue Events</p>
-                <p className="text-sm text-muted-foreground">
-                  Events in deiner Nähe
-                </p>
+                <p className="text-sm text-muted-foreground">Events in deiner Nähe</p>
               </div>
               <input type="checkbox" defaultChecked className="w-5 h-5" />
             </div>
@@ -164,22 +182,21 @@ export function ProfileSettingsScreen() {
                 <p>Hoher Kontrast</p>
                 <p className="text-sm text-muted-foreground">Bessere Lesbarkeit</p>
               </div>
-              <Switch
-                checked={highContrast}
-                onCheckedChange={setHighContrast}
-              />
+              <Switch checked={highContrast} onCheckedChange={setHighContrast} />
             </div>
           </div>
         </div>
 
+        {error && <p className="text-sm text-destructive text-center">{error}</p>}
+
         <Button
           onClick={handleSave}
+          disabled={saving}
           className="w-full h-12 bg-primary hover:bg-primary/90"
         >
-          Speichern
+          {saving ? "Speichern..." : "Speichern"}
         </Button>
       </div>
-
     </div>
   );
 }

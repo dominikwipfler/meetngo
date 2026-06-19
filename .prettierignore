@@ -1,0 +1,9 @@
+node_modules
+dist
+backend/uploads
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+pnpm-lock.yaml
+package-lock.json
+frontend/src/app/components/ui

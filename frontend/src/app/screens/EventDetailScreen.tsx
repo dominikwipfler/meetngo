@@ -7,16 +7,19 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../components/ui/s
 import { Label } from "../components/ui/label";
 import { getEventById, getImageUrl } from "../../api/events";
 import type { ApiEvent } from "../../api/events";
+import { createTicket } from "../../api/tickets";
 
 function formatDate(dateStr: string): string {
   try {
-    return new Date(dateStr).toLocaleString("de-DE", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }) + " Uhr";
+    return (
+      new Date(dateStr).toLocaleString("de-DE", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }) + " Uhr"
+    );
   } catch {
     return dateStr;
   }
@@ -29,6 +32,8 @@ export function EventDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [showTicketSheet, setShowTicketSheet] = useState(false);
   const [ticketQuantity, setTicketQuantity] = useState(1);
+  const [purchasing, setPurchasing] = useState(false);
+  const [purchaseError, setPurchaseError] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -54,9 +59,20 @@ export function EventDetailScreen() {
     );
   }
 
-  const handlePurchase = () => {
-    setShowTicketSheet(false);
-    navigate("/tickets");
+  const handlePurchase = async () => {
+    setPurchaseError("");
+    setPurchasing(true);
+    try {
+      for (let i = 0; i < ticketQuantity; i++) {
+        await createTicket(event.id);
+      }
+      setShowTicketSheet(false);
+      navigate("/tickets");
+    } catch (err: unknown) {
+      setPurchaseError(err instanceof Error ? err.message : "Kauf fehlgeschlagen");
+    } finally {
+      setPurchasing(false);
+    }
   };
 
   const isFree = event.price === "Kostenlos";
@@ -128,9 +144,7 @@ export function EventDetailScreen() {
 
           <div>
             <h3 className="mb-2">Beschreibung</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {event.description}
-            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed">{event.description}</p>
           </div>
 
           {!isFree && (
@@ -221,17 +235,20 @@ export function EventDetailScreen() {
                   </span>
                 </div>
               )}
+              {purchaseError && (
+                <p className="text-sm text-destructive text-center mb-3">{purchaseError}</p>
+              )}
               <Button
                 onClick={handlePurchase}
+                disabled={purchasing}
                 className="w-full h-12 bg-accent hover:bg-accent/90"
               >
-                {isFree ? "Bestätigen" : "Jetzt kaufen"}
+                {purchasing ? "Wird gebucht..." : isFree ? "Bestätigen" : "Jetzt kaufen"}
               </Button>
             </div>
           </div>
         </SheetContent>
       </Sheet>
-
     </div>
   );
 }

@@ -20,10 +20,7 @@ export function AccessibilityButton() {
 
       {showMenu && (
         <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setShowMenu(false)}
-          />
+          <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
           <div className="fixed bottom-32 right-4 z-50 bg-card border border-border rounded-xl p-4 shadow-xl min-w-[240px]">
             <h3 className="mb-4">Barrierefreiheit</h3>
             <div className="space-y-4">
@@ -32,9 +29,7 @@ export function AccessibilityButton() {
                 <Switch
                   id="dark-mode"
                   checked={theme === "dark"}
-                  onCheckedChange={(checked) =>
-                    setTheme(checked ? "dark" : "light")
-                  }
+                  onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
                 />
               </div>
               <div className="flex items-center justify-between">

@@ -1,4 +1,4 @@
-import { apiRequest } from './client';
+import { apiRequest } from "./client";
 
 export interface AuthUser {
   id: number;
@@ -12,15 +12,15 @@ export interface AuthResponse {
 }
 
 export function login(email: string, password: string): Promise<AuthResponse> {
-  return apiRequest('/auth/login', {
-    method: 'POST',
+  return apiRequest("/auth/login", {
+    method: "POST",
     body: JSON.stringify({ email, password }),
   });
 }
 
 export function register(username: string, email: string, password: string): Promise<AuthResponse> {
-  return apiRequest('/auth/register', {
-    method: 'POST',
+  return apiRequest("/auth/register", {
+    method: "POST",
     body: JSON.stringify({ username, email, password }),
   });
 }
