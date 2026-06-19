@@ -17,7 +17,7 @@
     "test": "pnpm --filter frontend test && pnpm --filter backend test"
   },
   "devDependencies": {
-    "concurrently": "^10.0.3"
+    "concurrently": "^9.2.3"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
