@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.MeetNGo" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Day/night-aware window background prevents a white flash on cold start
+             in dark mode before Compose draws. -->
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>

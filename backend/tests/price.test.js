@@ -1,4 +1,4 @@
-const { parsePriceValue } = require("../utils/price");
+const { parsePriceValue, formatPriceLabel } = require("../utils/price");
 
 describe("parsePriceValue", () => {
   it("returns 0 for 'Kostenlos'", () => {
@@ -24,5 +24,20 @@ describe("parsePriceValue", () => {
 
   it("falls back to 0 for unparseable input", () => {
     expect(parsePriceValue("auf Anfrage")).toBe(0);
+  });
+});
+
+describe("formatPriceLabel", () => {
+  it("returns 'Kostenlos' for empty, zero or missing input", () => {
+    expect(formatPriceLabel("")).toBe("Kostenlos");
+    expect(formatPriceLabel(null)).toBe("Kostenlos");
+    expect(formatPriceLabel("0")).toBe("Kostenlos");
+    expect(formatPriceLabel("Kostenlos")).toBe("Kostenlos");
+  });
+
+  it("normalizes whole and decimal inputs to a German two-decimal label", () => {
+    expect(formatPriceLabel("29")).toBe("29,00");
+    expect(formatPriceLabel("29.5")).toBe("29,50");
+    expect(formatPriceLabel("12,5")).toBe("12,50");
   });
 });

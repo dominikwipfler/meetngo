@@ -1,18 +1,19 @@
 # MeetNGo
 
 [![CI](https://github.com/dominikwipfler/meetngo/actions/workflows/ci.yml/badge.svg)](https://github.com/dominikwipfler/meetngo/actions/workflows/ci.yml)
-![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![Android](https://img.shields.io/badge/Android-Jetpack%20Compose-3DDC84?logo=android&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF?logo=kotlin&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-≥18-339933?logo=node.js&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-better--sqlite3-003B57?logo=sqlite&logoColor=white)
 
-Eine mobile Event-Discovery-App für Android: Events auf einer interaktiven Karte finden, durchsuchen, filtern, Tickets mit QR-Code "kaufen" und eigene Events veranstalten. Frontend mit React + Vite, Backend mit Express und SQLite.
+Eine mobile Event-Discovery-App für Android: Events auf einer interaktiven Karte finden, durchsuchen, filtern, Tickets mit QR-Code "kaufen" und eigene Events veranstalten. Native Android-App mit Jetpack Compose, Backend mit Express und SQLite.
 
 ---
 
 ## Inhalt
 
+- [Schnellstart](#schnellstart)
 - [Features](#features)
 - [Vorgaben & Extras](#vorgaben--extras)
 - [Tech-Stack](#tech-stack)
@@ -20,31 +21,57 @@ Eine mobile Event-Discovery-App für Android: Events auf einer interaktiven Kart
 - [Voraussetzungen](#voraussetzungen)
 - [Installation](#installation)
 - [Umgebungsvariablen](#umgebungsvariablen)
-- [Ausführung](#ausführung)
+- [Backend ausführen](#backend-ausführen)
+- [Android-App ausführen](#android-app-ausführen)
 - [Tests](#tests)
 - [Code-Qualität](#code-qualität)
 - [CI/CD](#cicd)
 - [API-Übersicht](#api-übersicht)
 - [Datenbank](#datenbank)
 - [Architektur](#architektur)
-- [Android-Build (Capacitor)](#android-build-capacitor)
-- [Screenshots](#screenshots)
 - [Design](#design)
+
+---
+
+## Schnellstart
+
+Du brauchst **Node.js ≥ 18** und **pnpm** (`npm install -g pnpm`). Für die Android-App zusätzlich **Android Studio** inkl. Android SDK und **JDK 17**.
+
+```bash
+git clone https://github.com/dominikwipfler/meetngo.git
+cd meetngo
+pnpm install
+pnpm dev
+```
+
+Das Backend läuft danach auf **http://localhost:3001** — **ohne weitere Konfiguration**:
+
+- Es ist **keine `.env` nötig**, um loszulegen: In der Entwicklung erzeugt das Backend bei fehlendem `JWT_SECRET` automatisch ein lokales Secret (`backend/.jwt-dev-secret`, gitignored). Für einen Produktiv-Betrieb muss `JWT_SECRET` gesetzt werden — siehe [Umgebungsvariablen](#umgebungsvariablen).
+- Die SQLite-Datenbank wird beim ersten Start automatisch unter `backend/meetngo.db` angelegt und mit Demo-Events befüllt.
+
+Für die **Android-App** (das laufende Backend vorausgesetzt):
+
+```bash
+cd android
+./gradlew installDebug   # baut & installiert die App auf laufendem Emulator/Gerät
+```
+
+Alternativ `android/` in Android Studio öffnen und die App auf einem Emulator starten. Die App verbindet sich automatisch über `10.0.2.2:3001` mit dem Backend. Details: [Android-App ausführen](#android-app-ausführen).
 
 ---
 
 ## Features
 
 - **Authentifizierung** — Registrierung & Login mit JWT, Passwörter werden mit bcrypt gehasht
-- **Kartenansicht** — Events als farbcodierte Marker nach Kategorie auf einer interaktiven Leaflet-Karte
+- **Kartenansicht** — Events als farbcodierte Marker nach Kategorie auf einer interaktiven OpenStreetMap-Karte (osmdroid), deren Kacheln über einen lokalen Backend-Proxy geladen werden
 - **Suche & Filter** — Volltextsuche, Kategorie-Filter, Preisfilter (kostenlos/kostenpflichtig), Sortierung nach Datum, Name, Beliebtheit oder Preis
 - **Event-Details** — Detailansicht mit Ticket-Kauf-Flow (Mengenwahl, Zahlungsmethoden-Auswahl)
 - **Echtes Ticket-System** — Tickets werden serverseitig angelegt (eigene `tickets`-Tabelle, an Event und Käufer gebunden), Kapazitätsgrenzen werden respektiert, Teilnehmerzahl wird automatisch hochgezählt
-- **Tickets mit QR-Code** — jedes Ticket erzeugt einen echten, scanbaren QR-Code (clientseitig gerendert, kein externer Dienst)
+- **Tickets mit QR-Code** — jedes Ticket erzeugt einen echten, scanbaren QR-Code (in der App generiert, kein externer Dienst); ein integrierter Scanner ermöglicht den Check-in
 - **Eigene Events erstellen** — inkl. Bild-Upload (JPG/PNG/WebP, max. 5 MB), Kategorie, Preis, Kapazität
+- **Favoriten & Folgen** — Events favorisieren und Veranstaltern folgen
 - **Organizer-Dashboard** — Statistiken und Verwaltung der eigenen Events
-- **Profil & Einstellungen** — Benutzername, E-Mail und Interessen werden serverseitig gespeichert (`PATCH /api/users/me`), Dark Mode
-- **Barrierefreiheits-Menü** — Dark-Mode- und Kontrast-Umschalter, jederzeit erreichbar
+- **Profil & Einstellungen** — Benutzername, E-Mail und Interessen werden serverseitig gespeichert (`PATCH /api/users/me`), Passwortänderung, Dark Mode
 - **Mobile-First-UI** — Bottom-Navigation, für Android-Bildschirme optimiert
 
 ## Vorgaben & Extras
@@ -53,124 +80,125 @@ Eine mobile Event-Discovery-App für Android: Events auf einer interaktiven Kart
 
 | Vorgabe | Umsetzung |
 |---|---|
-| Login/out | JWT-Login (`LoginScreen`) und Logout mit Sicherheitsabfrage (`ProfileScreen` → `AlertDialog` → `AuthContext.logout()`) |
-| Startseite mit Karte | `/map` ist die geschützte Landing-Route direkt nach dem Login (`LoginScreen` navigiert nach erfolgreichem Login auf `/map`); interaktive Leaflet-Karte mit kategorie-farbigen Markern, Live-Suche und Filter-Badges direkt auf der Karte |
+| Login/out | JWT-Login (`LoginScreen`) und Logout mit Sicherheitsabfrage (`ProfileScreen` → Bestätigungsdialog → Token-Reset im `AuthRepository`) |
+| Startseite mit Karte | Die Karte (`MapScreen`) ist die geschützte Landing-Route direkt nach dem Login; interaktive osmdroid-Karte mit kategorie-farbigen Markern, Live-Suche und Filtern |
 | Event Infos einsehbar | `EventDetailScreen` zeigt Bild, Beschreibung, Datum, Ort, Preis, Kapazität/Teilnehmerzahl und Veranstalter; erreichbar von Karte, Suche und Profil |
-| Event erstellen → Bild hochladen | `CreateEventScreen` mit Bild-Upload (JPG/PNG/WebP, clientseitig auf 5 MB geprüft, serverseitig per Multer validiert und gespeichert unter `backend/uploads/`) |
+| Event erstellen → Bild hochladen | `CreateEventScreen` mit Bild-Upload (JPG/PNG/WebP, serverseitig per Multer auf Typ und 5 MB validiert und gespeichert unter `backend/uploads/`) |
 | Bei der Suche filtern können | `SearchScreen`: Volltextsuche, Kategorie-Filter, Preisfilter (kostenlos/kostenpflichtig), Sortierung nach Datum/Name/Beliebtheit/Preis — zusätzlich auch direkt auf der Kartenansicht filterbar |
-| Gutes Design & Nutzerfreundlichkeit | Mobile-First-UI mit Bottom-Navigation, durchgängig ≥44px große Touch-Targets (Daumenfreundlichkeit), Bestätigungsdialog nur bei kritischen Aktionen wie Logout, Lade-/Fehlerzustände als Feedback bei jeder Interaktion, Dark Mode & Kontrast-Umschalter |
+| Gutes Design & Nutzerfreundlichkeit | Mobile-First-UI mit Bottom-Navigation, große Touch-Targets, Bestätigungsdialog nur bei kritischen Aktionen wie Logout, Lade-/Fehlerzustände als Feedback bei jeder Interaktion, Dark Mode |
 
 ### Extras über die Vorgaben hinaus
 
-Die Vorgaben verlangten fünf Kernfunktionen plus gutes Design. Umgesetzt wurde stattdessen eine **vollständige, produktionsnahe Anwendung** mit echtem Backend, persistenter Datenhaltung, automatisierten Tests und CI/CD — kein Mock-Datensatz im Frontend, sondern eine REST-API mit eigener Datenbank, die alle Geschäftsregeln serverseitig durchsetzt.
+Die Vorgaben verlangten fünf Kernfunktionen plus gutes Design. Umgesetzt wurde stattdessen eine **vollständige, produktionsnahe Anwendung** mit echtem Backend, persistenter Datenhaltung, automatisierten Tests und CI/CD — kein Mock-Datensatz in der App, sondern eine REST-API mit eigener Datenbank, die alle Geschäftsregeln serverseitig durchsetzt.
 
 #### 🎟️ Echtes Ticket-System statt Simulation
 
 - Tickets sind keine reine UI-Animation, sondern werden serverseitig in einer eigenen `tickets`-Tabelle angelegt, per Fremdschlüssel an Event *und* Käufer gebunden.
 - **Kapazitätsprüfung mit Race-Condition-Schutz**: Ein Kauf-Versuch für ein ausgebuchtes Event wird mit `409 Conflict` abgelehnt (`backend/routes/tickets.js`). Insert des Tickets *und* Hochzählen von `events.attendees` laufen dabei in einer einzigen `db.transaction(...)` — würde man das stattdessen als zwei separate Schreibzugriffe ausführen, könnten bei (fast) gleichzeitigen Käufen mehr Tickets verkauft werden als Plätze vorhanden sind. Die Transaktion macht den Kauf atomar.
-- **Echte, scanbare QR-Codes** pro Ticket — clientseitig generiert, kein externer Dienst, kein API-Limit.
+- **Ein Ticket pro Nutzer und Event**: Ein zweiter Kauf desselben Events durch denselben Nutzer wird mit `409 Conflict` abgelehnt — das verhindert verfälschte Teilnehmerzahlen und doppelte QR-Codes für dieselbe Person.
+- **Echte, scanbare QR-Codes** pro Ticket — in der App generiert, kein externer Dienst, kein API-Limit. Ein eingebauter Scanner (`ScannerScreen`) erlaubt den Ticket-Check-in (`POST /api/tickets/:id/checkin`).
 - **Organizer-Dashboard**: Veranstalter sehen Teilnehmerzahlen, Kapazitätsauslastung und Einnahmen ihrer eigenen Events live aus der Datenbank, nicht aus statischen Werten.
+
+#### 🗺️ Karte, die auch im Emulator funktioniert
+
+- Die Karte nutzt **osmdroid** mit OpenStreetMap-Kacheln. Im Emulator-Setup kann der Emulator jedoch keine externen DNS-Namen auflösen — die Kacheln von `tile.openstreetmap.org` würden nie ankommen und die Karte bliebe grau.
+- Lösung: Ein **lokaler Kachel-Proxy** im Backend (`backend/routes/tiles.js`) holt die Kacheln über den Host (mit Internet) und reicht sie an die App durch — erreichbar über `10.0.2.2:3001/tiles/:z/:x/:y.png`. Die App setzt diese URL als osmdroid-`XYTileSource` (siehe `MapScreen.kt`).
+- Der Proxy validiert die `z/x/y`-Koordinaten (Schutz vor Path-Traversal/SSRF), sendet einen aussagekräftigen `User-Agent` (von der OSM-Nutzungsrichtlinie verlangt) und legt die Kacheln in einem **Festplatten-Cache** (`backend/tiles-cache/`) ab, damit der OSM-Server nicht bei jedem Karten-Schwenk neu angefragt wird.
 
 #### 🔐 Sicherheit, die über "Login klappt" hinausgeht
 
 - Passwörter werden mit **bcrypt** gehasht (nie im Klartext gespeichert), Login/Registrierung über `POST /api/auth/*`.
+- **Brute-Force-Schutz**: Auth-Endpunkte sind rate-limited (max. 10 Versuche pro IP je 15 Minuten, `backend/middleware/rateLimit.js`).
 - **JWT-Auth zentral über eine gemeinsame Middleware** (`backend/middleware/auth.js`) — jede geschützte Route prüft den Token identisch, statt die Logik mehrfach zu duplizieren.
-- **Profil-Updates mit echter Konfliktbehandlung**: Ändert ein Nutzer Benutzername oder E-Mail auf einen bereits vergebenen Wert, fängt das Backend den `UNIQUE constraint`-Fehler der Datenbank ab und antwortet mit einer verständlichen `409`-Fehlermeldung statt eines rohen SQL-Fehlers oder eines stillen Fehlschlags.
-- **Validierte Datei-Uploads**: Bild-Uploads werden client- *und* serverseitig auf Dateityp (JPG/PNG/WebP) und Größe (max. 5 MB) geprüft. Ein dokumentierter Workaround für ein bekanntes Verhalten von `multer@1.x` (ein per `cb(error)` abgelehnter Dateifilter kann den Request hängen lassen) sorgt dafür, dass fehlerhafte Uploads zuverlässig als JSON-Fehler statt als hängende Verbindung oder Express-HTML-Fehlerseite beim Client ankommen (`backend/routes/events.js`).
+- **Security-Header** werden über eine eigene Middleware gesetzt (`backend/middleware/securityHeaders.js`).
+- **Profil-Updates mit echter Konfliktbehandlung**: Ändert ein Nutzer Benutzername oder E-Mail auf einen bereits vergebenen Wert, fängt das Backend den `UNIQUE constraint`-Fehler der Datenbank ab und antwortet mit einer verständlichen `409`-Fehlermeldung statt eines rohen SQL-Fehlers.
+- **Validierte Datei-Uploads**: Bild-Uploads werden serverseitig auf Dateityp (JPG/PNG/WebP) und Größe (max. 5 MB) geprüft. Ein dokumentierter Workaround für ein bekanntes Verhalten von `multer@1.x` sorgt dafür, dass fehlerhafte Uploads zuverlässig als JSON-Fehler statt als hängende Verbindung ankommen (`backend/routes/events.js`).
 - **Berechtigungsprüfung beim Löschen**: Nur der Ersteller eines Events darf es löschen (`organizer_id`-Abgleich gegen den eingeloggten Nutzer) — jeder andere Versuch wird mit `403 Forbidden` abgelehnt.
-- **Keine verwaisten Dateien**: Schlägt die Validierung beim Event-Erstellen fehl, wird ein bereits hochgeladenes Bild sofort wieder von der Platte gelöscht; löscht ein Veranstalter sein Event, wird auch das zugehörige Bild entfernt — `backend/uploads/` sammelt dadurch keine verwaisten Dateien an.
-- **Sicherer Fallback für `JWT_SECRET`**: Fehlt die Umgebungsvariable, startet der Server trotzdem (praktisch für schnelles lokales Ausprobieren), gibt dabei aber eine deutliche Konsolen-Warnung aus, statt unbemerkt mit einem unsicheren Default-Schlüssel weiterzulaufen (`backend/server.js`).
-- **Robuste Session-Wiederherstellung**: Der `AuthContext` lädt Token und Nutzerdaten beim App-Start aus `localStorage`; ist der gespeicherte Zustand beschädigt oder fehlerhaft, wird er automatisch verworfen statt die App mit einem unbehandelten Fehler abstürzen zu lassen.
+- **Keine verwaisten Dateien**: Schlägt die Validierung beim Event-Erstellen fehl, wird ein bereits hochgeladenes Bild sofort wieder von der Platte gelöscht; löscht ein Veranstalter sein Event, wird auch das zugehörige Bild entfernt.
+- **Sicheres `JWT_SECRET`-Handling je Umgebung** (`backend/middleware/auth.js`): In Produktion (`NODE_ENV=production`) ist das Secret zwingend — fehlt es, bricht der Start ab, statt mit einem erratbaren Schlüssel Tokens zu signieren. In der Entwicklung wird stattdessen automatisch ein lokales, persistiertes Zufalls-Secret erzeugt, damit ein frisch geklontes Projekt sofort startfähig ist, ohne dass je ein hartkodierter Default im Code steht.
 
 #### 🗄️ Datenbankdesign nach Lehrbuch
 
-- **Normalisiertes Schema** mit drei Tabellen (`users`, `events`, `tickets`) und expliziten Fremdschlüsselbeziehungen entlang der 1:n-Kardinalitäten (`events.organizer_id → users.id`, `tickets.event_id → events.id`, `tickets.user_id → users.id`) statt redundanter, eingebetteter Daten.
+- **Normalisiertes Schema** mit Fremdschlüsselbeziehungen entlang der 1:n-Kardinalitäten (`events.organizer_id → users.id`, `tickets.event_id → events.id`, `tickets.user_id → users.id`) statt redundanter, eingebetteter Daten.
 - **Fremdschlüssel-Constraints tatsächlich aktiv** — `PRAGMA foreign_keys = ON` wird explizit gesetzt; SQLite erzwingt referentielle Integrität standardmäßig *nicht*, dieser Schritt wird in der Praxis häufig vergessen.
-- **Bewusster Kompromiss bei der Preis-Spalte**: Preise werden als lesbarer Anzeige-String gespeichert (`"29,00"`, `"Kostenlos"`), zusätzlich aber als numerischer Wert in `price_value` dupliziert. Grund: Ein `ORDER BY` auf der reinen Text-Spalte würde lexikographisch sortieren — `"100,00"` käme vor `"29,00"`, weil `"1" < "2"` als Zeichen gilt. Die zusätzliche numerische Spalte ist eine bewusste, kommentierte Abweichung von strikter Normalisierung zugunsten korrekter Sortierung (`backend/utils/price.js`).
-- **Abwärtskompatible Schema-Migrationen**: Wird die App auf einer bereits existierenden, älteren Datenbank gestartet (z. B. ohne die Spalten `price_value` oder `interests`), erkennt `backend/database.js` das über `PRAGMA table_info` und ergänzt die fehlenden Spalten samt Backfill der vorhandenen Zeilen — statt die Datenbank zu löschen und neu zu erzeugen, was im Betrieb Datenverlust bedeuten würde.
+- **Bewusster Kompromiss bei der Preis-Spalte**: Preise werden als lesbarer Anzeige-String gespeichert (`"29,00"`, `"Kostenlos"`), zusätzlich aber als numerischer Wert in `price_value` dupliziert. Grund: Ein `ORDER BY` auf der reinen Text-Spalte würde lexikographisch sortieren — `"100,00"` käme vor `"29,00"`. Die zusätzliche numerische Spalte ist eine bewusste, kommentierte Abweichung von strikter Normalisierung zugunsten korrekter Sortierung (`backend/utils/price.js`).
+- **Abwärtskompatible Schema-Migrationen**: Wird die App auf einer bereits existierenden, älteren Datenbank gestartet, erkennt `backend/database.js` fehlende Spalten über `PRAGMA table_info` und ergänzt sie samt Backfill — statt die Datenbank zu löschen und neu zu erzeugen.
 
 #### ✅ Qualitätssicherung, wie sie in echten Projekten verlangt wird
 
-- **68 automatisierte Tests**: 49 Backend-Tests (`auth`, `events`, `tickets`, `users`, `price`) mit Vitest + Supertest gegen eine isolierte In-Memory-SQLite-Datenbank, die nie die lokale `meetngo.db` berührt; 19 Frontend-Tests (API-Client, Events, Tickets, `AuthContext`) mit Vitest + React Testing Library.
-- **GitHub-Actions-CI-Pipeline** (`.github/workflows/ci.yml`): Jeder Push und Pull Request durchläuft automatisch Install → Lint → Typecheck → Test → Build — schlägt einer dieser Schritte fehl, ist das in der PR sofort sichtbar, bevor fehlerhafter Code in `master` landet.
-- **TypeScript im `strict`-Modus** für das gesamte Frontend, **ESLint + Prettier** für Frontend und Backend mit einheitlicher Konfiguration.
-- **Saubere Lizenzangaben**: Verwendete Drittanbieter-Komponenten und -Bilder (shadcn/ui, Unsplash) sind mit Quelle und Lizenz in [`frontend/ATTRIBUTIONS.md`](frontend/ATTRIBUTIONS.md) dokumentiert.
-
-#### 📱 Mobile-UX-Details, die über "sieht gut aus" hinausgehen
-
-- **Durchgängig ≥44×44px große Touch-Targets** (Android-Design-Richtlinie für sichere Daumenbedienung), konsequent auch bei Icon-Buttons in Headern und Floating-Buttons.
-- **Bestätigungsdialoge gezielt nur bei kritischen/destruktiven Aktionen** (Logout, Event löschen), nicht bei jedem Tap — vermeidet "Dialog-Müdigkeit" und unnötige Reibung.
-- **Sichtbares Feedback bei jeder Interaktion**: Lade- und Fehlerzustände statt stiller Wartezeiten, z. B. "Speichern…" während des Profil-Updates oder klare Fehlertexte bei fehlgeschlagenem Login.
-- **Barrierefreiheits-Menü** mit Dark Mode und Hoch-Kontrast-Modus, jederzeit über einen fixen Button erreichbar, unabhängig vom aktuellen Screen.
-- **Bottom-Navigation** für einhändige Bedienung auf großen Smartphone-Displays statt einer oberen Navigationsleiste.
-
-#### 📦 Android-Build vorbereitet
-
-Die App lässt sich über Capacitor direkt als native Android-App verpacken, ohne den React-Code umzuschreiben (siehe [Android-Build](#android-build-capacitor)).
+- **Automatisierte Backend-Tests** mit Vitest + Supertest (`auth`, `events`, `tickets`, `users`, `price`, `tiles`, `rateLimit`, `securityHeaders`) gegen eine isolierte In-Memory-SQLite-Datenbank, die nie die lokale `meetngo.db` berührt.
+- **GitHub-Actions-CI-Pipeline** (`.github/workflows/ci.yml`): Jeder Push und Pull Request durchläuft automatisch Install → Lint → Test für das Backend sowie einen Debug-APK-Build der Android-App.
 
 ## Tech-Stack
 
 | Bereich | Technologien |
 |---|---|
-| Frontend | React 18, TypeScript (strict), Vite 6, Tailwind CSS 4, React Router 7 |
-| UI-Komponenten | Radix UI (shadcn-Pattern), Lucide Icons, React-Leaflet |
+| Android-App | Kotlin, Jetpack Compose, Material 3, Navigation Compose |
+| Karte | osmdroid (OpenStreetMap), Backend-Kachel-Proxy |
+| Netzwerk | Retrofit, OkHttp, Gson |
 | Backend | Node.js, Express 4, better-sqlite3, JWT, bcryptjs, Multer |
-| Tests | Vitest, React Testing Library, Supertest |
-| Tooling | ESLint, Prettier, pnpm Workspaces, GitHub Actions |
+| Tests | Vitest, Supertest |
+| Tooling | ESLint, Prettier, pnpm, Gradle, GitHub Actions |
 
 ## Projektstruktur
 
 ```
 meetngo/
-├── frontend/                       # React/Vite App (Android UI)
-│   ├── src/
-│   │   ├── api/                    # API-Client und Service-Funktionen
-│   │   │   ├── client.ts           # Fetch-Wrapper mit JWT-Authentifizierung
-│   │   │   ├── auth.ts             # login(), register()
-│   │   │   ├── events.ts           # CRUD-Operationen für Events
-│   │   │   ├── tickets.ts          # createTicket(), getMyTickets()
-│   │   │   └── users.ts            # getMyProfile(), updateProfile()
-│   │   ├── app/
-│   │   │   ├── components/         # Wiederverwendbare UI-Komponenten
-│   │   │   │   └── ui/             # shadcn/Radix-Primitives (generiert)
-│   │   │   └── screens/            # App-Screens (Login, Map, Search, …)
-│   │   ├── context/
-│   │   │   └── AuthContext.tsx     # Globaler Auth-State (JWT + User)
-│   │   ├── tests/setup.ts          # Vitest-Setup (jest-dom Matcher)
-│   │   └── main.tsx
-│   ├── *.test.ts(x)                # Unit-/Komponententests, neben dem Code
-│   ├── eslint.config.js
-│   ├── vitest.config.ts
-│   ├── vite.config.ts              # Vite + Proxy zu Backend (Port 3001)
-│   └── package.json
+├── android/                              # Native Android-App (Jetpack Compose)
+│   ├── app/
+│   │   ├── src/main/java/com/meetngo/app/
+│   │   │   ├── MainActivity.kt
+│   │   │   ├── data/
+│   │   │   │   ├── api/
+│   │   │   │   │   ├── ApiClient.kt       # Retrofit/OkHttp-Setup, BASE_URL (10.0.2.2)
+│   │   │   │   │   └── ApiService.kt      # Alle REST-Endpunkte als Retrofit-Interface
+│   │   │   │   ├── model/Models.kt        # Datenmodelle (Event, Ticket, User, …)
+│   │   │   │   └── repository/            # z. B. AuthRepository (hält JWT)
+│   │   │   ├── ui/
+│   │   │   │   ├── navigation/            # NavGraph, BottomNavBar
+│   │   │   │   ├── screens/               # auth, map, search, eventdetail,
+│   │   │   │   │                          #   createevent, tickets, scanner,
+│   │   │   │   │                          #   organizer, profile
+│   │   │   │   └── theme/                 # Compose-Theme, Dark Mode
+│   │   │   ├── util/
+│   │   │   └── res/xml/network_security_config.xml  # erlaubt Klartext-HTTP zu 10.0.2.2
+│   │   └── build.gradle.kts              # applicationId com.meetngo.app, minSdk 26, targetSdk 34
+│   ├── build.gradle.kts                  # AGP 8.5.2, Kotlin 1.9.24
+│   └── gradlew / gradlew.bat
 │
-├── backend/                        # Express.js REST-API
-│   ├── app.js                      # Express-App (ohne .listen — testbar)
-│   ├── server.js                   # Einstiegspunkt, startet app.js auf Port 3001
-│   ├── database.js                 # SQLite via better-sqlite3 + Seed-Daten
-│   ├── middleware/auth.js          # JWT-Auth-Middleware (geteilt von allen Routen)
-│   ├── utils/price.js              # Preis-String → numerischer Wert (Sortierung)
+├── backend/                              # Express.js REST-API
+│   ├── app.js                            # Express-App (ohne .listen — testbar)
+│   ├── server.js                         # Einstiegspunkt, startet app.js auf Port 3001
+│   ├── database.js                       # SQLite via better-sqlite3 + Seed-Daten
+│   ├── middleware/
+│   │   ├── auth.js                       # JWT-Auth-Middleware
+│   │   ├── rateLimit.js                  # Brute-Force-Schutz für Auth-Routen
+│   │   └── securityHeaders.js            # Security-Header
+│   ├── utils/                            # price.js (Sortierung), dbErrors.js
 │   ├── routes/
-│   │   ├── auth.js                 # POST /api/auth/register, /api/auth/login
-│   │   ├── events.js               # GET/POST/DELETE /api/events
-│   │   ├── tickets.js              # GET/POST /api/tickets
-│   │   └── users.js                # GET/PATCH /api/users/me
-│   ├── tests/                      # Vitest + Supertest (isolierte In-Memory-DB)
-│   ├── uploads/                    # Hochgeladene Event-Bilder (gitignored)
-│   ├── .env.example                # Vorlage für lokale .env
+│   │   ├── auth.js                       # POST /api/auth/register, /api/auth/login
+│   │   ├── events.js                     # CRUD /api/events + Favoriten
+│   │   ├── tickets.js                    # /api/tickets + Check-in
+│   │   ├── users.js                      # /api/users/me + Folgen
+│   │   └── tiles.js                      # OSM-Kachel-Proxy (/tiles/:z/:x/:y.png)
+│   ├── tests/                            # Vitest + Supertest (isolierte In-Memory-DB)
+│   ├── uploads/                          # Hochgeladene Event-Bilder (gitignored)
+│   ├── tiles-cache/                      # Festplatten-Cache des Kachel-Proxys (gitignored)
+│   ├── .env.example                      # Vorlage für lokale .env
 │   └── package.json
 │
-├── .github/workflows/ci.yml        # Lint, Typecheck, Test, Build bei jedem Push/PR
-├── guidelines/                     # Design-Guidelines aus Figma
-├── pnpm-workspace.yaml             # pnpm Monorepo-Konfiguration
-├── package.json                    # Root-Skripte (dev, build, lint, test, …)
+├── .github/workflows/ci.yml              # Backend Lint/Test + Android-APK-Build
+├── guidelines/                           # Design-Guidelines
+├── package.json                          # Root-Skripte (delegieren ans Backend)
 └── .gitignore
 ```
 
 ## Voraussetzungen
 
-- **Node.js** 18 oder neuer
-- **pnpm** (empfohlen): `npm install -g pnpm`
+- **Node.js** 18 oder neuer (Backend)
+- **pnpm**: `npm install -g pnpm`
+- **Android Studio** (für die App) inkl. Android SDK; ein Emulator (AVD) oder ein per ADB verbundenes Gerät
+- **JDK 17** (für den Gradle-Build)
 
 ## Installation
 
@@ -180,85 +208,142 @@ cd meetngo
 pnpm install
 ```
 
-Das installiert die Dependencies für Root, `frontend/` und `backend/` in einem Schritt (pnpm-Workspace).
+`pnpm install` installiert die Backend-Dependencies. Die Android-App wird separat über Android Studio bzw. Gradle gebaut (siehe [Android-App ausführen](#android-app-ausführen)).
 
 ## Umgebungsvariablen
 
-Das Backend liest Konfiguration aus einer `.env`-Datei (siehe [`backend/.env.example`](backend/.env.example)):
+**Für die lokale Entwicklung ist keine Konfiguration nötig** — `pnpm dev` läuft direkt nach dem Clone (siehe [Schnellstart](#schnellstart)). Optional liest das Backend Konfiguration aus einer `.env`-Datei (Vorlage: [`backend/.env.example`](backend/.env.example)):
 
 ```bash
-cd backend
-cp .env.example .env
+cp backend/.env.example backend/.env
 ```
 
-Einen sicheren `JWT_SECRET` generieren:
+| Variable | Beschreibung | Default |
+|---|---|---|
+| `PORT` | Port, auf dem das Backend lauscht | `3001` |
+| `JWT_SECRET` | Geheimnis zum Signieren der JWTs | In der Entwicklung automatisch erzeugt; in **Produktion erforderlich** |
+
+**`JWT_SECRET` – Verhalten je nach Umgebung:**
+
+- **Entwicklung/Test** (Default): Ist `JWT_SECRET` nicht gesetzt, erzeugt das Backend einmalig ein zufälliges Secret und legt es unter `backend/.jwt-dev-secret` (gitignored) ab, sodass ausgestellte Logins auch über Neustarts hinweg gültig bleiben. Es ist also nichts zu tun.
+- **Produktion** (`NODE_ENV=production`): `JWT_SECRET` ist **zwingend** — fehlt es, bricht der Start mit einem Fehler ab (`backend/middleware/auth.js`), damit der Server nie mit einem erratbaren Schlüssel Tokens signiert.
+
+Einen sicheren `JWT_SECRET` für die Produktion generieren:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
-Ohne gesetztes `JWT_SECRET` startet der Server trotzdem (mit unsicherem Default-Wert) und gibt eine Warnung aus — praktisch für schnelles lokales Ausprobieren, aber nicht für den produktiven Einsatz gedacht.
+`backend/.env` ist gitignored und darf keine echten Geheimnisse im Repo hinterlassen.
 
-## Ausführung
-
-### Beide gleichzeitig (empfohlen)
+## Backend ausführen
 
 ```bash
-pnpm dev
+pnpm install      # einmalig, im Projekt-Root
+pnpm dev          # startet das Backend im Watch-Modus (nodemon)
 ```
 
-Startet Backend (Port 3001) und Frontend (Port 5173) gleichzeitig. Anschließend `http://localhost:5173` öffnen.
-
-### Einzeln starten
+Das Backend lauscht anschließend auf `http://localhost:3001`. Alternativ direkt im Backend-Verzeichnis:
 
 ```bash
-pnpm dev:backend    # nur Backend
-pnpm dev:frontend   # nur Frontend
+cd backend
+npm run dev       # nodemon (Watch-Modus)
+npm start         # ohne Watch
 ```
 
-Vite proxied alle `/api`- und `/uploads`-Anfragen automatisch zum Backend.
+Beim ersten Start wird die SQLite-Datenbank automatisch unter `backend/meetngo.db` angelegt und mit Demo-Events befüllt.
+
+## Android-App ausführen
+
+1. **Backend starten** (siehe oben) — die App benötigt die laufende API.
+2. `android/` in **Android Studio** öffnen (Gradle-Sync abwarten) **oder** im Terminal bauen:
+
+   ```bash
+   cd android
+   ./gradlew assembleDebug        # baut die Debug-APK
+   ./gradlew installDebug         # installiert auf laufendem Emulator/Gerät
+   ```
+
+3. Einen **Emulator (AVD)** starten oder ein Gerät per ADB verbinden und die App ausführen.
+
+### Netzwerk: 10.0.2.2 statt localhost
+
+Der Android-Emulator erreicht den Host (auf dem das Backend läuft) **nicht** über `localhost` — das zeigt auf den Emulator selbst. Stattdessen wird die Sonderadresse `10.0.2.2` verwendet, die der Emulator auf den Host umleitet. Die Basis-URL ist deshalb fest auf
+
+```
+http://10.0.2.2:3001/
+```
+
+gesetzt (`android/app/src/main/java/com/meetngo/app/data/api/ApiClient.kt`). Da es sich um Klartext-HTTP handelt, ist `10.0.2.2` in `res/xml/network_security_config.xml` explizit für unverschlüsselten Verkehr freigegeben.
+
+> **Echtes Gerät:** Auf einem physischen Gerät statt eines Emulators muss `BASE_URL` auf die LAN-IP des Entwicklungsrechners zeigen (z. B. `http://192.168.x.x:3001/`), und die `network_security_config.xml` muss diese Adresse zulassen.
+
+### Karten-Kacheln (Tile-Proxy)
+
+Die Karte lädt ihre OpenStreetMap-Kacheln **nicht** direkt von `tile.openstreetmap.org`, sondern über den Backend-Proxy unter `10.0.2.2:3001/tiles/...`. Grund: Der Emulator kann externe DNS-Namen nicht auflösen; das Backend (auf dem Host mit Internet) holt die Kacheln und reicht sie durch (`backend/routes/tiles.js`). Es muss daher kein zusätzlicher Dienst konfiguriert werden — das laufende Backend genügt.
+
+### Event-Bilder (lokales Serving)
+
+Hochgeladene Event-Bilder liegen unter `backend/uploads/` und werden vom Backend als statische Dateien unter `/uploads/...` ausgeliefert. Die App baut die Bild-URLs relativ zur `BASE_URL` (`10.0.2.2:3001`), sodass die Bilder im Emulator korrekt geladen werden, ohne dass ein externer Bild-Host/CDN nötig ist.
 
 ## Tests
 
 ```bash
-pnpm test                       # Frontend- und Backend-Tests
-pnpm --filter frontend test     # nur Frontend (Vitest + React Testing Library)
-pnpm --filter backend test      # nur Backend (Vitest + Supertest)
+pnpm test                    # Backend-Tests (Vitest + Supertest)
+# oder direkt:
+cd backend && npm test
 ```
 
-Backend-Tests laufen gegen eine isolierte In-Memory-SQLite-Datenbank (`DB_PATH=:memory:`) und beeinflussen nie die lokale `meetngo.db`.
+Backend-Tests laufen gegen eine isolierte In-Memory-SQLite-Datenbank und beeinflussen nie die lokale `meetngo.db`.
+
+Die Android-App wird in CI über einen Debug-APK-Build verifiziert:
+
+```bash
+cd android && ./gradlew assembleDebug
+```
 
 ## Code-Qualität
 
 ```bash
-pnpm lint        # ESLint (Frontend + Backend)
-pnpm lint:fix     # ESLint mit Autofix
-pnpm format       # Prettier
-pnpm typecheck    # TypeScript --strict (Frontend)
+pnpm lint        # ESLint (Backend)
+pnpm lint:fix    # ESLint mit Autofix
+pnpm format      # Prettier (Backend)
 ```
-
-shadcn/Radix-UI-Primitives unter `frontend/src/app/components/ui/` sind generierter Code und bewusst von Prettier sowie der `react-refresh`-ESLint-Regel ausgenommen.
 
 ## CI/CD
 
-Jeder Push und Pull Request auf `master` durchläuft via [GitHub Actions](.github/workflows/ci.yml): Install → Lint → Typecheck → Test → Build.
+Jeder Push und Pull Request auf `master` durchläuft via [GitHub Actions](.github/workflows/ci.yml) zwei Jobs:
+
+- **build-and-test**: `pnpm install` → `pnpm lint` → `pnpm test` (Backend)
+- **android-build**: JDK 17 + Gradle → `./gradlew assembleDebug` (Android Debug-APK)
 
 ## API-Übersicht
 
-Das Backend läuft auf `http://localhost:3001`.
+Das Backend läuft auf `http://localhost:3001` (vom Emulator als `http://10.0.2.2:3001` erreichbar).
 
 | Methode | Endpoint | Beschreibung |
 |--------|----------|-------------|
-| POST | `/api/auth/register` | Neues Konto erstellen |
+| POST | `/api/auth/register` | Neues Konto erstellen, gibt JWT zurück |
 | POST | `/api/auth/login` | Einloggen, gibt JWT zurück |
 | GET | `/api/events` | Events abrufen (mit Filter/Sort) |
 | GET | `/api/events/:id` | Ein Event abrufen |
 | POST | `/api/events` | Event erstellen (Auth + Bild-Upload) |
+| PATCH | `/api/events/:id` | Event-Felder aktualisieren (nur Ersteller) |
 | DELETE | `/api/events/:id` | Event löschen (nur Ersteller) |
+| GET | `/api/events/favorites` | Eigene favorisierte Events (Auth) |
+| GET | `/api/events/:id/favorite-status` | Favoriten-Status eines Events (Auth) |
+| POST/DELETE | `/api/events/:id/favorite` | Event favorisieren / entfavorisieren (Auth) |
 | GET | `/api/tickets` | Eigene Tickets abrufen (Auth) |
 | POST | `/api/tickets` | Ticket für ein Event kaufen (Auth, `{ eventId }`) |
+| DELETE | `/api/tickets/:id` | Ticket stornieren (Auth) |
+| POST | `/api/tickets/:id/checkin` | Ticket einchecken (Scanner) |
 | GET | `/api/users/me` | Eigenes Profil abrufen (Auth) |
 | PATCH | `/api/users/me` | Profil aktualisieren (Auth, `{ username?, email?, interests? }`) |
+| PATCH | `/api/users/me/password` | Passwort ändern (Auth) |
+| GET | `/api/users/:id/follow-status` | Folge-Status eines Veranstalters (Auth) |
+| POST/DELETE | `/api/users/:id/follow` | Veranstalter folgen / entfolgen (Auth) |
+| GET | `/tiles/:z/:x/:y.png` | OSM-Kachel-Proxy für die Karte |
+| GET | `/uploads/:file` | Statisch ausgelieferte Event-Bilder |
 
 ### Filter-Parameter für `GET /api/events`
 
@@ -269,50 +354,34 @@ Das Backend läuft auf `http://localhost:3001`.
 | `sort` | `date`, `name`, `attendees`, `price` | Sortierfeld (`price` sortiert numerisch über die interne `price_value`-Spalte) |
 | `order` | `asc`, `desc` | Sortierreihenfolge |
 | `priceFilter` | `free`, `paid` | Kostenlos / Kostenpflichtig |
+| `organizerId` | Zahl | Nur Events eines bestimmten Veranstalters |
 
 ## Datenbank
 
 Die SQLite-Datenbank wird beim ersten Start automatisch unter `backend/meetngo.db` erstellt und mit Demo-Events befüllt. Die Datei ist gitignored und wird **nicht** versioniert.
 
-Preise werden als Anzeige-String gespeichert (z. B. `"29,00"` oder `"Kostenlos"`) plus einer numerischen `price_value`-Spalte für korrekte Sortierung — ein reiner Textvergleich würde z. B. `"100,00"` vor `"29,00"` einsortieren.
+Preise werden als Anzeige-String gespeichert (z. B. `"29,00"` oder `"Kostenlos"`) plus einer numerischen `price_value`-Spalte für korrekte Sortierung.
 
-Hochgeladene Event-Bilder liegen unter `backend/uploads/` und sind ebenfalls gitignored.
+Hochgeladene Event-Bilder liegen unter `backend/uploads/` und gecachte Karten-Kacheln unter `backend/tiles-cache/` — beide sind gitignored.
 
-Tickets sind in einer eigenen `tickets`-Tabelle abgelegt (`event_id`, `user_id`, `status`) und per Foreign Key an Events und Nutzer gebunden. Ein Kauf erhöht `events.attendees` und schlägt fehl (`409`), sobald `events.capacity` erreicht ist.
+Tickets sind in einer eigenen `tickets`-Tabelle abgelegt (`event_id`, `user_id`, `status`) und per Foreign Key an Events und Nutzer gebunden. Ein Kauf erhöht `events.attendees` und schlägt fehl (`409`), sobald `events.capacity` erreicht ist oder der Nutzer bereits ein Ticket für dieses Event besitzt (ein Ticket pro Nutzer und Event).
 
 Nutzer-Interessen liegen als JSON-Array in der `interests`-Spalte der `users`-Tabelle. Änderungen an Benutzername oder E-Mail werden auf Eindeutigkeit geprüft (`409` bei Konflikt).
 
 ## Architektur
 
-- **Frontend ↔ Backend**: Das Frontend spricht ausschließlich über die REST-API (`/api/...`) mit dem Backend; Vite proxied im Dev-Modus dorthin. Auth-Status liegt in `AuthContext` (React Context) und im `localStorage` (JWT + User-Objekt).
-- **Routing**: React Router v7 mit geschützten Routen (`ProtectedRoute`) für alles außer Login/Registrierung.
-- **Backend-Schichten**: `server.js` (Prozess-Einstieg) → `app.js` (Express-App, ohne Seiteneffekt testbar) → `routes/` (HTTP-Handler) → `database.js` (SQLite-Zugriff). Diese Trennung erlaubt es, `app.js` in Tests direkt mit Supertest anzusprechen, ohne einen echten Port zu öffnen.
+Das Projekt besteht aus zwei Teilen: der **nativen Android-App** und dem **Express-Backend**.
+
+- **Android ↔ Backend**: Die App spricht ausschließlich über die REST-API (`/api/...`) mit dem Backend. Der Netzwerk-Layer basiert auf Retrofit/OkHttp (`data/api/`); ein OkHttp-Interceptor hängt das JWT automatisch als `Authorization: Bearer …`-Header an jeden Request an. Das Token hält der `AuthRepository`/`ApiClient` als Singleton-Zustand.
+- **UI**: Jetpack Compose mit Navigation Compose (`ui/navigation/NavGraph.kt`), Bottom-Navigation und einem zentralen Compose-Theme (inkl. Dark Mode). Screens liegen nach Feature getrennt unter `ui/screens/`.
+- **Karte**: osmdroid mit einer eigenen `XYTileSource`, die auf den Backend-Kachel-Proxy (`/tiles/`) zeigt (siehe oben).
+- **Backend-Schichten**: `server.js` (Prozess-Einstieg, lädt `.env`, startet den Listener) → `app.js` (Express-App, ohne Seiteneffekt testbar) → `routes/` (HTTP-Handler) → `database.js` (SQLite-Zugriff). Diese Trennung erlaubt es, `app.js` in Tests direkt mit Supertest anzusprechen, ohne einen echten Port zu öffnen.
 - **Auth**: JWT im `Authorization: Bearer …`-Header, serverseitig per gemeinsamer Middleware (`middleware/auth.js`) geprüft; Events kennen ihren Ersteller über `organizer_id` für Lösch-Berechtigungen, Tickets ihren Käufer über `user_id`.
 - **Ticket-Kauf**: Insert + Attendees-Update laufen in einer SQLite-Transaktion (`db.transaction(...)`), damit beide Schreiboperationen atomar zusammen erfolgen.
-
-## Android-Build (Capacitor)
-
-Da die App mit React/Vite gebaut ist, kann sie über Capacitor als native Android-App verpackt werden:
-
-```bash
-cd frontend
-npm install @capacitor/core @capacitor/cli @capacitor/android
-npx cap init MeetNGo com.meetngo.app --web-dir dist
-npm run build
-npx cap add android
-npx cap open android
-```
-
-> Das Backend muss auf einem erreichbaren Server laufen. Die API-Basis-URL in `frontend/src/api/client.ts` muss für den Android-Build auf die Serveradresse angepasst werden (z. B. `http://192.168.1.x:3001`).
-
-## Screenshots
-
-<!-- TODO: Screenshots der App hier einfügen, z. B.: -->
-<!-- ![Karte](docs/screenshots/map.png) ![Tickets](docs/screenshots/tickets.png) -->
 
 ## Design
 
 Das UI-Design basiert auf dem Figma-Projekt:
 https://www.figma.com/design/XFbfqoyFt7IFZrnVYUjUzJ/MeetNGo-Mobile-App-UI
 
-Verwendete Drittanbieter-Komponenten und -Inhalte: siehe [`frontend/ATTRIBUTIONS.md`](frontend/ATTRIBUTIONS.md) (shadcn/ui, Unsplash).
+Design-Guidelines: siehe [`guidelines/Guidelines.md`](guidelines/Guidelines.md).

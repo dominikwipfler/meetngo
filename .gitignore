@@ -1,19 +1,22 @@
 # Dependencies
 node_modules/
-frontend/node_modules/
 backend/node_modules/
 
 # Lock files (pnpm manages this)
 package-lock.json
-frontend/package-lock.json
 backend/package-lock.json
 
 # Build output
 dist/
-frontend/dist/
 .vite/
-frontend/.vite/
 *.tsbuildinfo
+
+# Heruntergeladene Kartenkacheln (Cache des Tile-Proxys, siehe routes/tiles.js)
+backend/tiles-cache/
+
+# Lokal generiertes JWT-Secret für die Entwicklung (siehe middleware/auth.js).
+# Niemals committen — Produktion nutzt JWT_SECRET aus der Umgebung.
+backend/.jwt-dev-secret
 
 # SQLite database (contains user data — do not commit)
 backend/meetngo.db
@@ -23,16 +26,17 @@ backend/meetngo.db-wal
 # Uploaded event images (user content — do not commit)
 backend/uploads/*
 !backend/uploads/.gitkeep
+# …except the bundled seed images: app assets the backend serves as fallback
+# event pictures (referenced by database.js / routes/events.js).
+!backend/uploads/seed/
+!backend/uploads/seed/**
 
 # Local env files
 .env
 .env.*
-frontend/.env
-frontend/.env.*
 backend/.env
 backend/.env.*
 !.env.example
-!frontend/.env.example
 !backend/.env.example
 
 # Logs

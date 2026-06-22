@@ -49,6 +49,24 @@ db.exec(`
     FOREIGN KEY (event_id) REFERENCES events(id),
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS follows (
+    follower_id INTEGER NOT NULL,
+    organizer_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (follower_id, organizer_id),
+    FOREIGN KEY (follower_id) REFERENCES users(id),
+    FOREIGN KEY (organizer_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS favorites (
+    user_id INTEGER NOT NULL,
+    event_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, event_id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (event_id) REFERENCES events(id)
+  );
 `);
 
 // Migration: add price_value to databases created before this column existed
@@ -66,6 +84,11 @@ if (!eventColumns.some((col) => col.name === "price_value")) {
 const userColumns = db.prepare("PRAGMA table_info(users)").all();
 if (!userColumns.some((col) => col.name === "interests")) {
   db.exec("ALTER TABLE users ADD COLUMN interests TEXT DEFAULT '[]'");
+}
+
+// Migration: add active flag so organizers can deactivate events without deleting
+if (!eventColumns.some((col) => col.name === "active")) {
+  db.exec("ALTER TABLE events ADD COLUMN active INTEGER DEFAULT 1");
 }
 
 // Seed demo events if table is empty
@@ -316,6 +339,48 @@ if (count.count === 0) {
     25,
     "Outdoor",
   );
+}
+
+// Backfill realistic, category-appropriate demo images for seeded events.
+// Images are bundled in backend/uploads/seed and served by the backend itself
+// (see app.js: app.use("/uploads", ...)), so they load reliably on every device
+// without depending on external CDNs or internet access. Paths are relative;
+// the apps' image helpers prepend the backend base URL.
+//
+// Fills any event that has no image at all (so every card shows a picture), and
+// additionally replaces old absolute (http) URLs from earlier demo seeds.
+// Locally uploaded images (/uploads/...) of real user events are never touched.
+const CATEGORY_IMAGES = {
+  Musik: ["/uploads/seed/musik1.jpg", "/uploads/seed/musik2.jpg"],
+  Sport: ["/uploads/seed/sport1.jpg", "/uploads/seed/sport2.jpg"],
+  Food: ["/uploads/seed/food1.jpg", "/uploads/seed/food2.jpg"],
+  Tech: ["/uploads/seed/tech1.jpg", "/uploads/seed/tech2.jpg"],
+  Kunst: ["/uploads/seed/kunst1.jpg", "/uploads/seed/kunst2.jpg"],
+  Outdoor: ["/uploads/seed/outdoor1.jpg", "/uploads/seed/outdoor2.jpg"],
+  Sonstiges: ["/uploads/seed/sonstiges1.jpg", "/uploads/seed/sonstiges2.jpg"],
+};
+const FALLBACK_IMAGES = CATEGORY_IMAGES.Sonstiges;
+
+const demoEventsNeedingImage = db
+  .prepare(
+    `SELECT id, category FROM events
+       WHERE image_path IS NULL
+          OR image_path = ''
+          OR (organizer_id IS NULL AND image_path LIKE 'http%')
+       ORDER BY id`,
+  )
+  .all();
+if (demoEventsNeedingImage.length > 0) {
+  const setImage = db.prepare("UPDATE events SET image_path = ? WHERE id = ?");
+  const perCategory = {};
+  db.transaction(() => {
+    for (const event of demoEventsNeedingImage) {
+      const pool = CATEGORY_IMAGES[event.category] || FALLBACK_IMAGES;
+      const index = perCategory[event.category] || 0;
+      perCategory[event.category] = index + 1;
+      setImage.run(pool[index % pool.length], event.id);
+    }
+  })();
 }
 
 module.exports = db;

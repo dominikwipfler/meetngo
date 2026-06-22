@@ -1,4 +1,4 @@
-const request = require("supertest");
+const request = require("./request");
 const app = require("../app");
 
 describe("POST /api/auth/register", () => {

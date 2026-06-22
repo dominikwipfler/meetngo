@@ -1,0 +1,4 @@
+<resources>
+    <!-- Matches DarkColors.background in Theme.kt (#1A1A19). -->
+    <color name="window_background">#FF1A1A19</color>
+</resources>

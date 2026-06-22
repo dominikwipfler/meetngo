@@ -8,4 +8,15 @@ function parsePriceValue(price) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-module.exports = { parsePriceValue };
+// Normalizes a raw price input into the canonical display label used across the
+// app: "Kostenlos" for 0/empty, otherwise a German-formatted amount with two
+// decimals and a comma separator (e.g. "29" -> "29,00", "29.5" -> "29,50").
+// This keeps user-entered prices consistent with the seeded demo data and
+// prevents mixed "." / "," separators in the UI.
+function formatPriceLabel(price) {
+  const value = parsePriceValue(price);
+  if (value <= 0) return "Kostenlos";
+  return `${value.toFixed(2).replace(".", ",")}`;
+}
+
+module.exports = { parsePriceValue, formatPriceLabel };

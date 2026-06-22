@@ -1,4 +1,4 @@
-const request = require("supertest");
+const request = require("./request");
 const app = require("../app");
 
 async function registerUser(suffix) {
@@ -121,5 +121,104 @@ describe("PATCH /api/users/me", () => {
       .send({ email: "profileuser_patch7a@example.com" });
 
     expect(res.status).toBe(409);
+  });
+});
+
+describe("Follow / Abonnenten", () => {
+  it("rejects unauthenticated follow", async () => {
+    const res = await request(app).post("/api/users/1/follow");
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects following yourself", async () => {
+    const { token, userId } = await registerUser("follow_self");
+    const res = await request(app)
+      .post(`/api/users/${userId}/follow`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 for an unknown organizer", async () => {
+    const { token } = await registerUser("follow_404");
+    const res = await request(app)
+      .post("/api/users/999999/follow")
+      .set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(404);
+  });
+
+  it("follows and unfollows, tracking the follower count", async () => {
+    const organizer = await registerUser("follow_org");
+    const fan = await registerUser("follow_fan");
+
+    const before = await request(app)
+      .get(`/api/users/${organizer.userId}/follow-status`)
+      .set("Authorization", `Bearer ${fan.token}`);
+    expect(before.body).toEqual({ following: false, followers: 0 });
+
+    const followed = await request(app)
+      .post(`/api/users/${organizer.userId}/follow`)
+      .set("Authorization", `Bearer ${fan.token}`);
+    expect(followed.status).toBe(200);
+    expect(followed.body).toEqual({ following: true, followers: 1 });
+
+    // Idempotent: following again does not double-count.
+    const again = await request(app)
+      .post(`/api/users/${organizer.userId}/follow`)
+      .set("Authorization", `Bearer ${fan.token}`);
+    expect(again.body.followers).toBe(1);
+
+    const unfollowed = await request(app)
+      .delete(`/api/users/${organizer.userId}/follow`)
+      .set("Authorization", `Bearer ${fan.token}`);
+    expect(unfollowed.body).toEqual({ following: false, followers: 0 });
+  });
+});
+
+describe("PATCH /api/users/me/password", () => {
+  it("rejects unauthenticated requests", async () => {
+    const res = await request(app)
+      .patch("/api/users/me/password")
+      .send({ currentPassword: "password123", newPassword: "newpass123" });
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects a wrong current password", async () => {
+    const { token } = await registerUser("pw_wrong");
+    const res = await request(app)
+      .patch("/api/users/me/password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ currentPassword: "totally-wrong", newPassword: "newpass123" });
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects a too-short new password", async () => {
+    const { token } = await registerUser("pw_short");
+    const res = await request(app)
+      .patch("/api/users/me/password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ currentPassword: "password123", newPassword: "123" });
+    expect(res.status).toBe(400);
+  });
+
+  it("changes the password and lets the user log in with the new one", async () => {
+    const suffix = "pw_ok";
+    const { token } = await registerUser(suffix);
+    const email = `profileuser_${suffix}@example.com`;
+
+    const change = await request(app)
+      .patch("/api/users/me/password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ currentPassword: "password123", newPassword: "brandnew123" });
+    expect(change.status).toBe(200);
+
+    const oldLogin = await request(app)
+      .post("/api/auth/login")
+      .send({ email, password: "password123" });
+    expect(oldLogin.status).toBe(401);
+
+    const newLogin = await request(app)
+      .post("/api/auth/login")
+      .send({ email, password: "brandnew123" });
+    expect(newLogin.status).toBe(200);
   });
 });

@@ -1,4 +1,4 @@
-const request = require("supertest");
+const request = require("./request");
 const app = require("../app");
 
 async function registerUser(suffix) {
@@ -89,6 +89,22 @@ describe("POST /api/tickets", () => {
       .send({ eventId: event.id });
     expect(second.status).toBe(409);
   });
+
+  it("rejects purchases for a deactivated event", async () => {
+    const organizer = await registerUser("organizer_inactive");
+    const event = await createEvent(organizer.token, {});
+    await request(app)
+      .patch(`/api/events/${event.id}`)
+      .set("Authorization", `Bearer ${organizer.token}`)
+      .send({ active: false });
+
+    const buyer = await registerUser("buy_inactive");
+    const res = await request(app)
+      .post("/api/tickets")
+      .set("Authorization", `Bearer ${buyer.token}`)
+      .send({ eventId: event.id });
+    expect(res.status).toBe(409);
+  });
 });
 
 describe("GET /api/tickets", () => {
@@ -119,5 +135,114 @@ describe("GET /api/tickets", () => {
       .get("/api/tickets")
       .set("Authorization", `Bearer ${otherUser.token}`);
     expect(otherTickets.body).toEqual([]);
+  });
+});
+
+describe("DELETE /api/tickets/:id", () => {
+  it("rejects unauthenticated requests", async () => {
+    const res = await request(app).delete("/api/tickets/1");
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 for an unknown ticket", async () => {
+    const { token } = await registerUser("cancel1");
+    const res = await request(app)
+      .delete("/api/tickets/999999")
+      .set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects cancellation by a different user", async () => {
+    const organizer = await registerUser("organizer4");
+    const event = await createEvent(organizer.token);
+    const buyer = await registerUser("cancel2");
+    const bought = await request(app)
+      .post("/api/tickets")
+      .set("Authorization", `Bearer ${buyer.token}`)
+      .send({ eventId: event.id });
+
+    const other = await registerUser("cancel3");
+    const res = await request(app)
+      .delete(`/api/tickets/${bought.body.id}`)
+      .set("Authorization", `Bearer ${other.token}`);
+    expect(res.status).toBe(403);
+  });
+
+  it("cancels the owner's ticket and frees up an attendee slot", async () => {
+    const organizer = await registerUser("organizer5");
+    const event = await createEvent(organizer.token);
+    const buyer = await registerUser("cancel4");
+    const bought = await request(app)
+      .post("/api/tickets")
+      .set("Authorization", `Bearer ${buyer.token}`)
+      .send({ eventId: event.id });
+
+    const afterBuy = await request(app).get(`/api/events/${event.id}`);
+    expect(afterBuy.body.attendees).toBe(1);
+
+    const res = await request(app)
+      .delete(`/api/tickets/${bought.body.id}`)
+      .set("Authorization", `Bearer ${buyer.token}`);
+    expect(res.status).toBe(200);
+
+    const afterCancel = await request(app).get(`/api/events/${event.id}`);
+    expect(afterCancel.body.attendees).toBe(0);
+
+    const myTickets = await request(app)
+      .get("/api/tickets")
+      .set("Authorization", `Bearer ${buyer.token}`);
+    expect(myTickets.body.find((t) => t.id === bought.body.id)).toBeUndefined();
+  });
+});
+
+describe("POST /api/tickets/:id/checkin", () => {
+  it("rejects unauthenticated requests", async () => {
+    const res = await request(app).post("/api/tickets/1/checkin");
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 for an unknown ticket", async () => {
+    const { token } = await registerUser("checkin404");
+    const res = await request(app)
+      .post("/api/tickets/999999/checkin")
+      .set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects check-in by someone who is not the event organizer", async () => {
+    const organizer = await registerUser("checkin_org1");
+    const event = await createEvent(organizer.token);
+    const buyer = await registerUser("checkin_buyer1");
+    const bought = await request(app)
+      .post("/api/tickets")
+      .set("Authorization", `Bearer ${buyer.token}`)
+      .send({ eventId: event.id });
+
+    // The buyer (not the organizer) tries to check in their own ticket.
+    const res = await request(app)
+      .post(`/api/tickets/${bought.body.id}/checkin`)
+      .set("Authorization", `Bearer ${buyer.token}`);
+    expect(res.status).toBe(403);
+  });
+
+  it("lets the organizer redeem a ticket once, then rejects re-use", async () => {
+    const organizer = await registerUser("checkin_org2");
+    const event = await createEvent(organizer.token);
+    const buyer = await registerUser("checkin_buyer2");
+    const bought = await request(app)
+      .post("/api/tickets")
+      .set("Authorization", `Bearer ${buyer.token}`)
+      .send({ eventId: event.id });
+
+    const first = await request(app)
+      .post(`/api/tickets/${bought.body.id}/checkin`)
+      .set("Authorization", `Bearer ${organizer.token}`);
+    expect(first.status).toBe(200);
+    expect(first.body.status).toBe("used");
+
+    const second = await request(app)
+      .post(`/api/tickets/${bought.body.id}/checkin`)
+      .set("Authorization", `Bearer ${organizer.token}`);
+    expect(second.status).toBe(409);
   });
 });

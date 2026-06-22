@@ -1,0 +1,5 @@
+<resources>
+    <!-- Launcher icon uses the brand-gradient drawable @drawable/ic_launcher_background. -->
+    <!-- Light window background (see values-night for the dark variant). -->
+    <color name="window_background">#FFFFFFFF</color>
+</resources>
