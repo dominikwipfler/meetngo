@@ -173,7 +173,9 @@ fun EventDetailScreen(navController: NavHostController, apiService: ApiService, 
             if (created > 0) {
                 showTicketSheet = false
                 navController.navigate(Routes.TICKETS) {
-                    popUpTo(Routes.MAP)
+                    popUpTo(Routes.MAP) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
                 }
             } else {
                 purchaseError = failure?.toApiErrorMessage("Kauf fehlgeschlagen")

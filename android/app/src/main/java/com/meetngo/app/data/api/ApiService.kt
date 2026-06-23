@@ -92,6 +92,10 @@ interface ApiService {
     @DELETE("api/tickets/{id}")
     suspend fun deleteTicket(@Path("id") id: Int)
 
+    /** Überträgt ein eigenes Ticket per E-Mail-Adresse an einen anderen registrierten Nutzer. */
+    @POST("api/tickets/{id}/transfer")
+    suspend fun transferTicket(@Path("id") id: Int, @Body body: TransferTicketRequest): Ticket
+
     @POST("api/tickets/{id}/checkin")
     suspend fun checkinTicket(@Path("id") id: Int): CheckinResponse
 

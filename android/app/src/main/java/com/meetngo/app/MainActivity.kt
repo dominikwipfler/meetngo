@@ -7,6 +7,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -15,6 +18,8 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
@@ -99,7 +104,23 @@ class MainActivity : ComponentActivity() {
                     Scaffold(
                         bottomBar = { if (showBottomBar) BottomNavBar(navController) },
                     ) { padding ->
-                        Box(Modifier.padding(padding)) {
+                        // Die Kartenansicht soll randlos bis unter die Statusleiste reichen
+                        // (eigene Statusleisten-Aussparung übernimmt MapScreen selbst für sein
+                        // Suchfeld), alle anderen Screens behalten das normale obere Padding.
+                        val isMapScreen = currentEntry?.destination?.hierarchy?.any {
+                            it.route == Routes.MAP
+                        } == true
+                        val contentPadding = if (isMapScreen) {
+                            PaddingValues(
+                                start = padding.calculateStartPadding(LocalLayoutDirection.current),
+                                top = 0.dp,
+                                end = padding.calculateEndPadding(LocalLayoutDirection.current),
+                                bottom = padding.calculateBottomPadding(),
+                            )
+                        } else {
+                            padding
+                        }
+                        Box(Modifier.padding(contentPadding)) {
                             AppNavHost(
                                 navController = navController,
                                 authRepository = authRepository,

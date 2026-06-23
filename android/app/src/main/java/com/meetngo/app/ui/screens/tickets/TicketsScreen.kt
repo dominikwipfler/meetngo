@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -30,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -56,7 +58,9 @@ import coil.compose.AsyncImage
 import com.meetngo.app.data.api.ApiService
 import com.meetngo.app.data.api.BASE_URL
 import com.meetngo.app.data.model.Ticket
+import com.meetngo.app.data.model.TransferTicketRequest
 import com.meetngo.app.ui.navigation.Routes
+import com.meetngo.app.ui.screens.auth.toAuthErrorMessage
 import com.meetngo.app.ui.theme.MeetNGoColors
 import com.meetngo.app.util.formatDateShort
 import kotlinx.coroutines.launch
@@ -86,6 +90,11 @@ fun TicketsScreen(navController: NavHostController, apiService: ApiService) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var qrTicket by remember { mutableStateOf<Ticket?>(null) }
     var cancelTarget by remember { mutableStateOf<Ticket?>(null) }
+    var transferTarget by remember { mutableStateOf<Ticket?>(null) }
+    var transferEmail by remember { mutableStateOf("") }
+    var transferError by remember { mutableStateOf("") }
+    var transferring by remember { mutableStateOf(false) }
+    var transferResultMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     // Lädt alle Tickets des eingeloggten Benutzers einmalig beim Öffnen des Screens.
@@ -105,6 +114,28 @@ fun TicketsScreen(navController: NavHostController, apiService: ApiService) {
             runCatching { apiService.deleteTicket(ticket.id) }
                 .onSuccess { tickets = tickets.filterNot { it.id == ticket.id } }
             cancelTarget = null
+        }
+    }
+
+    /** Überträgt ein Ticket per E-Mail an einen anderen Nutzer; entfernt es bei Erfolg aus der eigenen Liste. */
+    fun handleTransfer(ticket: Ticket) {
+        val email = transferEmail.trim()
+        if (!email.contains("@")) {
+            transferError = "Bitte gib eine gültige E-Mail-Adresse ein"
+            return
+        }
+        transferring = true
+        transferError = ""
+        scope.launch {
+            runCatching { apiService.transferTicket(ticket.id, TransferTicketRequest(email)) }
+                .onSuccess {
+                    tickets = tickets.filterNot { it.id == ticket.id }
+                    transferTarget = null
+                    transferEmail = ""
+                    transferResultMessage = "Ticket für \"${ticket.eventName}\" wurde an $email übertragen."
+                }
+                .onFailure { e -> transferError = e.toAuthErrorMessage("Übertragung fehlgeschlagen") }
+            transferring = false
         }
     }
 
@@ -145,6 +176,7 @@ fun TicketsScreen(navController: NavHostController, apiService: ApiService) {
                                     ticket = ticket,
                                     onShowQr = { qrTicket = ticket },
                                     onCancel = { cancelTarget = ticket },
+                                    onTransfer = { transferTarget = ticket; transferEmail = ""; transferError = "" },
                                     onClick = { navController.navigate(Routes.eventDetail(ticket.eventId)) },
                                 )
                             }
@@ -221,6 +253,61 @@ fun TicketsScreen(navController: NavHostController, apiService: ApiService) {
             },
         )
     }
+
+    transferTarget?.let { ticket ->
+        AlertDialog(
+            onDismissRequest = { if (!transferring) { transferTarget = null; transferError = "" } },
+            title = { Text("Ticket übertragen") },
+            text = {
+                Column {
+                    Text(
+                        "Übertrage dein Ticket für \"${ticket.eventName}\" an eine andere Person. " +
+                            "Sie benötigt einen MeetNGo-Account mit dieser E-Mail-Adresse. " +
+                            "Du verlierst danach den Zugriff auf dieses Ticket.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    OutlinedTextField(
+                        value = transferEmail,
+                        onValueChange = { transferEmail = it; transferError = "" },
+                        label = { Text("E-Mail-Adresse") },
+                        singleLine = true,
+                        isError = transferError.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    )
+                    if (transferError.isNotBlank()) {
+                        Text(
+                            transferError,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { handleTransfer(ticket) }, enabled = !transferring) {
+                    Text("Übertragen")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { transferTarget = null; transferError = "" },
+                    enabled = !transferring,
+                ) { Text("Abbrechen") }
+            },
+        )
+    }
+
+    transferResultMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { transferResultMessage = null },
+            title = { Text("Ticket übertragen") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { transferResultMessage = null }) { Text("OK") }
+            },
+        )
+    }
 }
 
 /** Platzhalter-Anzeige (Icon + Text), wenn der aktive bzw. vergangene Tab keine Tickets enthält. */
@@ -242,12 +329,13 @@ private fun EmptyState(text: String) {
     }
 }
 
-/** Karte für ein aktives Ticket mit Event-Vorschau, Status-Badge sowie Buttons zum Anzeigen des QR-Codes und zum Stornieren. */
+/** Karte für ein aktives Ticket mit Event-Vorschau, Status-Badge sowie Buttons zum Anzeigen des QR-Codes, Übertragen und Stornieren. */
 @Composable
 private fun ActiveTicketCard(
     ticket: Ticket,
     onShowQr: () -> Unit,
     onCancel: () -> Unit,
+    onTransfer: () -> Unit,
     onClick: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
@@ -303,13 +391,19 @@ private fun ActiveTicketCard(
                     Icon(Icons.Filled.QrCode, contentDescription = null, modifier = Modifier.size(16.dp))
                     Text(" QR-Code")
                 }
-                OutlinedButton(
-                    onClick = onCancel,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(" Stornieren", color = MaterialTheme.colorScheme.error)
+                OutlinedButton(onClick = onTransfer, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Text(" Übertragen")
                 }
+            }
+            TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.error,
+                )
+                Text(" Stornieren", color = MaterialTheme.colorScheme.error)
             }
         }
     }

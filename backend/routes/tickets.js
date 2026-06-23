@@ -95,6 +95,46 @@ router.delete("/:id", authMiddleware, (req, res) => {
   res.json({ success: true });
 });
 
+// POST /api/tickets/:id/transfer { email } — überträgt ein eigenes Ticket auf
+// einen anderen registrierten Nutzer (z. B. weil man selbst nicht mehr kann).
+// Es findet kein echter Zahlungsfluss statt — das Ticket wechselt einfach den
+// Besitzer, die ursprüngliche Buchung/QR-Code bleibt erhalten.
+router.post("/:id/transfer", authMiddleware, (req, res) => {
+  const ticket = db.prepare("SELECT * FROM tickets WHERE id = ?").get(req.params.id);
+  if (!ticket) {
+    return res.status(404).json({ error: "Ticket nicht gefunden" });
+  }
+  if (ticket.user_id !== req.user.userId) {
+    return res.status(403).json({ error: "Keine Berechtigung" });
+  }
+  if (ticket.status === "used") {
+    return res.status(409).json({ error: "Ein bereits eingelöstes Ticket kann nicht übertragen werden" });
+  }
+
+  const email = (req.body.email || "").toLowerCase().trim();
+  if (!email) {
+    return res.status(400).json({ error: "E-Mail-Adresse ist erforderlich" });
+  }
+
+  const recipient = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+  if (!recipient) {
+    return res.status(404).json({ error: "Kein Nutzer mit dieser E-Mail-Adresse gefunden" });
+  }
+  if (recipient.id === req.user.userId) {
+    return res.status(400).json({ error: "Du kannst dein Ticket nicht an dich selbst übertragen" });
+  }
+
+  const existing = db
+    .prepare("SELECT id FROM tickets WHERE event_id = ? AND user_id = ?")
+    .get(ticket.event_id, recipient.id);
+  if (existing) {
+    return res.status(409).json({ error: "Diese Person hat bereits ein Ticket für dieses Event" });
+  }
+
+  db.prepare("UPDATE tickets SET user_id = ? WHERE id = ?").run(recipient.id, ticket.id);
+  res.json(ticketWithEvent(ticket.id));
+});
+
 // POST /api/tickets/:id/checkin — an organizer validates/redeems a ticket for
 // their own event (used by the QR scanner). Marks the ticket as "used" once.
 router.post("/:id/checkin", authMiddleware, (req, res) => {

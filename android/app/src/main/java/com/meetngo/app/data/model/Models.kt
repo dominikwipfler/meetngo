@@ -80,6 +80,9 @@ data class Ticket(
 /** Request-Body zum Erstellen/Kaufen eines Tickets für eine bestimmte Veranstaltung. */
 data class CreateTicketRequest(val eventId: Int)
 
+/** Request-Body zum Übertragen eines eigenen Tickets an einen anderen Nutzer per E-Mail-Adresse. */
+data class TransferTicketRequest(val email: String)
+
 /** Request-Body zum Aktualisieren der Featured-/Aktiv-Flags einer Veranstaltung durch den Veranstalter. */
 data class UpdateEventRequest(val featured: Boolean? = null, val active: Boolean? = null)
 
