@@ -128,7 +128,7 @@ if (count.count === 0) {
   seedEvent(
     "Karlsruhe Jazz Festival",
     "Erlebe eine Nacht voller Jazz mit internationalen Künstlern. Das Festival präsentiert die besten Jazz-Acts aus ganz Europa in einer unvergesslichen Atmosphäre.",
-    "2026-05-25T19:00:00",
+    "2026-06-29T19:00:00",
     "Konzerthaus Karlsruhe",
     49.0069,
     8.4037,
@@ -140,7 +140,7 @@ if (count.count === 0) {
   seedEvent(
     "Open-Air Konzert im Schlosspark",
     "Klassische Musik unter freiem Himmel im wunderschönen Karlsruher Schlosspark. Bringt eure Picknick-Decken mit!",
-    "2026-07-04T20:00:00",
+    "2026-08-08T20:00:00",
     "Schlosspark Karlsruhe",
     49.0135,
     8.4044,
@@ -152,7 +152,7 @@ if (count.count === 0) {
   seedEvent(
     "Indie Rock Night",
     "Die besten lokalen Indie-Bands spielen live. Entdecke neue Talente aus der Karlsruher Musikszene.",
-    "2026-06-20T21:00:00",
+    "2026-07-25T21:00:00",
     "Substage Karlsruhe",
     49.0042,
     8.3934,
@@ -164,7 +164,7 @@ if (count.count === 0) {
   seedEvent(
     "Elektro Festival KA",
     "Ein Wochenende voller elektronischer Musik mit DJs aus ganz Deutschland. Headliner werden noch bekannt gegeben.",
-    "2026-08-15T16:00:00",
+    "2026-09-19T16:00:00",
     "Europahalle Karlsruhe",
     49.0068,
     8.3952,
@@ -178,7 +178,7 @@ if (count.count === 0) {
   seedEvent(
     "Marathon 2026",
     "Der jährliche Karlsruhe Marathon führt durch die schönsten Teile der Stadt. Verschiedene Distanzen für alle Fitnesslevel.",
-    "2026-09-05T09:00:00",
+    "2026-10-10T09:00:00",
     "Stadtmitte Karlsruhe",
     49.0087,
     8.4043,
@@ -190,7 +190,7 @@ if (count.count === 0) {
   seedEvent(
     "Volleyball Turnier",
     "Beachvolleyball-Turnier am Rhein. Teams mit 2–4 Personen können sich anmelden. Preise für die Top 3.",
-    "2026-07-12T10:00:00",
+    "2026-08-16T10:00:00",
     "Rheinpark Karlsruhe",
     48.9942,
     8.3712,
@@ -202,7 +202,7 @@ if (count.count === 0) {
   seedEvent(
     "Yoga im Park",
     "Kostenloser Yoga-Kurs für alle Level jeden Samstag im Stadtgarten. Matte mitbringen!",
-    "2026-06-07T09:30:00",
+    "2026-07-12T09:30:00",
     "Stadtgarten Karlsruhe",
     49.0116,
     8.4031,
@@ -216,7 +216,7 @@ if (count.count === 0) {
   seedEvent(
     "Weihnachtsmarkt",
     "Der traditionelle Weihnachtsmarkt bringt festliche Stimmung in die Innenstadt. Genieße Glühwein, Lebkuchen und regionale Spezialitäten.",
-    "2026-12-01T11:00:00",
+    "2027-01-05T11:00:00",
     "Marktplatz Karlsruhe",
     49.0094,
     8.4044,
@@ -228,7 +228,7 @@ if (count.count === 0) {
   seedEvent(
     "Street Food Festival",
     "Entdecke kulinarische Köstlichkeiten aus aller Welt. Über 50 Food-Trucks und Stände bieten internationale Spezialitäten.",
-    "2026-06-15T12:00:00",
+    "2026-07-20T12:00:00",
     "Stadtpark Karlsruhe",
     49.0086,
     8.4029,
@@ -240,7 +240,7 @@ if (count.count === 0) {
   seedEvent(
     "Weinprobe im Schloss",
     "Exklusive Weinverkostung mit regionalen Weinen aus Baden-Württemberg. Fachkundige Begleitung durch einen Sommelier.",
-    "2026-06-28T17:00:00",
+    "2026-08-02T17:00:00",
     "Karlsruher Schloss",
     49.0135,
     8.4044,
@@ -254,7 +254,7 @@ if (count.count === 0) {
   seedEvent(
     "Tech Meetup Karlsruhe",
     "Networking-Event für Tech-Enthusiasten. Vorträge über die neuesten Entwicklungen in AI, Web3 und Cloud Computing.",
-    "2026-06-10T18:00:00",
+    "2026-07-15T18:00:00",
     "Coworking Space Karlsruhe",
     49.0102,
     8.4051,
@@ -266,7 +266,7 @@ if (count.count === 0) {
   seedEvent(
     "Hackathon KA 2026",
     "48 Stunden coden, netzwerken und Ideen umsetzen. Teams aus 2–5 Personen lösen reale Probleme der Stadt Karlsruhe.",
-    "2026-07-25T09:00:00",
+    "2026-08-29T09:00:00",
     "Hochschule Karlsruhe",
     49.0091,
     8.4117,
@@ -278,7 +278,7 @@ if (count.count === 0) {
   seedEvent(
     "KI & Gesellschaft",
     "Podiumsdiskussion über die Auswirkungen von Künstlicher Intelligenz auf Arbeit, Bildung und Demokratie.",
-    "2026-06-18T19:30:00",
+    "2026-07-23T19:30:00",
     "ZKM Karlsruhe",
     49.0052,
     8.3895,
@@ -292,7 +292,7 @@ if (count.count === 0) {
   seedEvent(
     "Kunstnacht Karlsruhe",
     "Eine Nacht lang öffnen Galerien, Ateliers und Museen ihre Türen. Erlebe Kunst in ungewöhnlicher Atmosphäre.",
-    "2026-09-19T18:00:00",
+    "2026-10-24T18:00:00",
     "Innenstadt Karlsruhe",
     49.0094,
     8.4044,
@@ -304,7 +304,7 @@ if (count.count === 0) {
   seedEvent(
     "Skulpturen im Park",
     "Interaktive Skulpturenausstellung im Günther-Klotz-Anlage. Lokale Künstler präsentieren ihre Werke unter freiem Himmel.",
-    "2026-06-01T10:00:00",
+    "2026-07-06T10:00:00",
     "Günther-Klotz-Anlage",
     49.0002,
     8.3945,
@@ -318,7 +318,7 @@ if (count.count === 0) {
   seedEvent(
     "Stadtradeln Karlsruhe",
     "Gemeinsam durch die Stadt radeln und dabei das Klima schützen. Tages- und Wochentour für alle Altersgruppen.",
-    "2026-06-22T10:00:00",
+    "2026-07-27T10:00:00",
     "Marktplatz Karlsruhe",
     49.0094,
     8.4044,
@@ -330,7 +330,7 @@ if (count.count === 0) {
   seedEvent(
     "Klettern im Hardtwald",
     "Geführte Klettertour durch den Hardtwald nördlich von Karlsruhe. Ausrüstung wird gestellt, Anfänger willkommen.",
-    "2026-07-05T09:00:00",
+    "2026-08-09T09:00:00",
     "Hardtwald Karlsruhe",
     49.042,
     8.412,
@@ -338,6 +338,114 @@ if (count.count === 0) {
     "18,00",
     25,
     "Outdoor",
+  );
+  seedEvent(
+    "Stand-Up-Paddling Schnupperkurs",
+    "Einsteigerkurs für Stand-Up-Paddling im Rheinhafen. Board und Paddel werden gestellt, Schwimmkenntnisse erforderlich.",
+    "2026-08-02T10:00:00",
+    "Rheinhafen Karlsruhe",
+    48.975,
+    8.33,
+    "Kanu Club Karlsruhe",
+    "20,00",
+    18,
+    "Outdoor",
+  );
+
+  // weitere Musik
+  seedEvent(
+    "Silent Disco im Stadtgarten",
+    "Tanzen mit Kopfhörern statt Lautsprechern: drei Kanäle, drei DJs, eine stille Nacht für die Nachbarschaft.",
+    "2026-08-22T21:00:00",
+    "Stadtgarten Karlsruhe",
+    49.0116,
+    8.4031,
+    "KA Events",
+    "10,00",
+    150,
+    "Musik",
+  );
+
+  // weiterer Sport
+  seedEvent(
+    "Basketball Streetball Cup",
+    "3-gegen-3-Turnier für Hobby- und Vereinsspieler auf dem Freiluftcourt. Anmeldung als Team oder einzeln möglich.",
+    "2026-09-06T11:00:00",
+    "Otto-Dullenkopf-Park",
+    49.021,
+    8.422,
+    "Basketball Verband Karlsruhe",
+    "Kostenlos",
+    90,
+    "Sport",
+  );
+
+  // weiteres Food
+  seedEvent(
+    "Craft Beer Festival",
+    "Über 20 badische Mikrobrauereien stellen ihre Biere vor, dazu Live-Musik und Foodtrucks auf dem Gelände.",
+    "2026-07-31T17:00:00",
+    "Alter Schlachthof Karlsruhe",
+    49.0024,
+    8.4145,
+    "Karlsruher Brauverein",
+    "3,00",
+    560,
+    "Food",
+  );
+
+  // weiteres Tech
+  seedEvent(
+    "Startup Pitch Night",
+    "Fünf lokale Startups pitchen vor Investoren und Publikum, im Anschluss Networking bei Getränken.",
+    "2026-08-20T18:30:00",
+    "CyberForum Karlsruhe",
+    49.008,
+    8.39,
+    "CyberForum e.V.",
+    "Kostenlos",
+    140,
+    "Tech",
+  );
+
+  // weitere Kunst
+  seedEvent(
+    "Streetart Walking Tour",
+    "Geführter Rundgang zu den größten Wandgemälden und Murals der Oststadt, mit Hintergründen zu den Künstlern.",
+    "2026-07-19T15:00:00",
+    "Oststadt Karlsruhe",
+    49.0125,
+    8.425,
+    "Kulturamt Karlsruhe",
+    "8,00",
+    35,
+    "Kunst",
+  );
+
+  // Sonstiges
+  seedEvent(
+    "Flohmarkt am Schlossplatz",
+    "Trödeln, stöbern, schnäppchen: privater Flohmarkt mit Ständen für Kleidung, Bücher und Vintage-Fundstücke.",
+    "2026-07-11T10:00:00",
+    "Schlossplatz Karlsruhe",
+    49.0136,
+    8.4039,
+    "Stadt Karlsruhe",
+    "Kostenlos",
+    420,
+    "Sonstiges",
+  );
+  seedEvent(
+    "Brettspiele-Abend",
+    "Gemütlicher Spieleabend mit über 100 Brett- und Kartenspielen für alle Altersgruppen, Anfänger willkommen.",
+    "2026-07-18T19:00:00",
+    "Spielebar Würfelglück",
+    49.0094,
+    8.3858,
+    "Spielebar Würfelglück",
+    "5,00",
+    28,
+    "Sonstiges",
   );
 }
 
