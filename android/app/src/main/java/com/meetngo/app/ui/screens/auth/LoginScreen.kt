@@ -21,11 +21,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -36,18 +34,19 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavHostController
 import com.meetngo.app.data.api.ApiService
-import com.meetngo.app.data.model.LoginRequest
 import com.meetngo.app.data.repository.AuthRepository
 import com.meetngo.app.ui.navigation.Routes
 import com.meetngo.app.ui.theme.MeetNGoColors
-import kotlinx.coroutines.launch
 
 /**
  * Login-Bildschirm: Logo/Branding, E-Mail- und Passwortfeld sowie ein Link
- * zur Registrierung. Bei erfolgreichem Login wird die Sitzung im
- * [authRepository] gespeichert und zur Kartenansicht navigiert.
+ * zur Registrierung. Der UI-Zustand und der Login-Aufruf liegen im
+ * [LoginViewModel]; bei erfolgreichem Login wird zur Kartenansicht navigiert.
  */
 @Composable
 fun LoginScreen(
@@ -55,33 +54,21 @@ fun LoginScreen(
     authRepository: AuthRepository,
     apiService: ApiService,
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    val viewModel: LoginViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer { LoginViewModel(authRepository, apiService) }
+        },
+    )
+    val uiState by viewModel.uiState.collectAsState()
 
-    /** Validiert die Eingaben, ruft den Login-Endpunkt auf und navigiert bei Erfolg zur Kartenansicht. */
-    fun handleLogin() {
-        error = ""
-        if (email.isBlank() || password.isBlank()) {
-            error = "Bitte E-Mail und Passwort eingeben"
-            return
-        }
-        loading = true
-        scope.launch {
-            try {
-                val res = apiService.login(LoginRequest(email, password))
-                authRepository.login(res.token, res.user)
-                navController.navigate(Routes.MAP) {
-                    // Entfernt den Login-Screen vollständig aus dem Backstack, damit der Zurück-Button
-                    // nach erfolgreichem Login nicht wieder dorthin zurückführt.
-                    popUpTo(Routes.LOGIN) { inclusive = true }
-                }
-            } catch (e: Exception) {
-                error = e.toAuthErrorMessage("Anmeldung fehlgeschlagen")
-            } finally {
-                loading = false
+    // Navigiert erst, nachdem der ViewModel-State auf "eingeloggt" gewechselt hat,
+    // statt direkt im Login-Callback — damit die Navigation nicht mehrfach feuert.
+    LaunchedEffect(uiState.loggedIn) {
+        if (uiState.loggedIn) {
+            navController.navigate(Routes.MAP) {
+                // Entfernt den Login-Screen vollständig aus dem Backstack, damit der Zurück-Button
+                // nach erfolgreichem Login nicht wieder dorthin zurückführt.
+                popUpTo(Routes.LOGIN) { inclusive = true }
             }
         }
     }
@@ -123,8 +110,8 @@ fun LoginScreen(
             ) {
                 Text("E-Mail", style = MaterialTheme.typography.labelLarge)
                 OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
+                    value = uiState.email,
+                    onValueChange = { viewModel.onEmailChange(it) },
                     placeholder = { Text("max@example.com") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
@@ -140,33 +127,33 @@ fun LoginScreen(
             ) {
                 Text("Passwort", style = MaterialTheme.typography.labelLarge)
                 OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
+                    value = uiState.password,
+                    onValueChange = { viewModel.onPasswordChange(it) },
                     placeholder = { Text("••••••••") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { handleLogin() }),
+                    keyboardActions = KeyboardActions(onDone = { viewModel.login() }),
                     colors = filledFieldColors,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
 
             // Fehlertext wird nur angezeigt, wenn Validierung oder Backend-Aufruf fehlgeschlagen sind.
-            if (error.isNotBlank()) {
-                Text(text = error, color = MaterialTheme.colorScheme.error)
+            if (uiState.error.isNotBlank()) {
+                Text(text = uiState.error, color = MaterialTheme.colorScheme.error)
             }
 
             // Login-Button: zeigt während des Requests einen Lade-Indikator statt des Labels.
             Button(
-                onClick = { handleLogin() },
-                enabled = !loading,
+                onClick = { viewModel.login() },
+                enabled = !uiState.loading,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MeetNGoColors.BrandCoral,
                 ),
             ) {
-                if (loading) {
+                if (uiState.loading) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp))
                 } else {
                     Text("Einloggen")

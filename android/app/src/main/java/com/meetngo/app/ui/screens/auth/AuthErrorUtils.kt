@@ -14,11 +14,15 @@ fun Throwable.toAuthErrorMessage(fallback: String): String {
     if (this is HttpException) {
         // errorBody() kann nur einmal gelesen werden, daher direkt zwischenspeichern.
         val body = response()?.errorBody()?.string()
-        if (!body.isNullOrBlank()) {
-            // Fehlerantwort ist nicht immer valides JSON (z. B. bei Netzwerk-/Proxy-Fehlern) – im Zweifel auf fallback zurückfallen.
-            val parsed = runCatching { Gson().fromJson(body, ApiError::class.java) }.getOrNull()
-            if (parsed?.error?.isNotBlank() == true) return parsed.error
-        }
+        parseErrorMessage(body)?.let { return it }
     }
     return fallback
+}
+
+/** Extrahiert die "error"-Nachricht aus einem JSON-Fehlerbody, oder null falls nicht vorhanden/valide. */
+internal fun parseErrorMessage(body: String?): String? {
+    if (body.isNullOrBlank()) return null
+    // Fehlerantwort ist nicht immer valides JSON (z. B. bei Netzwerk-/Proxy-Fehlern) – im Zweifel null liefern.
+    val parsed = runCatching { Gson().fromJson(body, ApiError::class.java) }.getOrNull()
+    return parsed?.error?.takeIf { it.isNotBlank() }
 }

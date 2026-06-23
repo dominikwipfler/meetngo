@@ -30,6 +30,7 @@ Eine mobile Event-Discovery-App für Android: Events auf einer interaktiven Kart
 - [Datenbank](#datenbank)
 - [Architektur](#architektur)
 - [Design](#design)
+- [Bekannte Verbesserungspunkte](#bekannte-verbesserungspunkte)
 
 ---
 
@@ -137,8 +138,8 @@ Die Vorgaben verlangten fünf Kernfunktionen plus gutes Design. Umgesetzt wurde 
 | Karte | osmdroid (OpenStreetMap), Backend-Kachel-Proxy |
 | Netzwerk | Retrofit, OkHttp, Gson |
 | Backend | Node.js, Express 4, better-sqlite3, JWT, bcryptjs, Multer |
-| Tests | Vitest, Supertest |
-| Tooling | ESLint, Prettier, pnpm, Gradle, GitHub Actions |
+| Tests | Vitest, Supertest (Backend); JUnit (Android, `src/test/`) |
+| Tooling | ESLint, Prettier, pnpm, Gradle (mit Version Catalog), GitHub Actions |
 
 ## Projektstruktur
 
@@ -162,7 +163,9 @@ meetngo/
 │   │   │   │   └── theme/                 # Compose-Theme, Dark Mode
 │   │   │   ├── util/
 │   │   │   └── res/xml/network_security_config.xml  # erlaubt Klartext-HTTP zu 10.0.2.2
+│   │   ├── src/test/java/com/meetngo/app/  # JUnit-Unit-Tests (reine Kotlin-Logik, kein Android-SDK nötig)
 │   │   └── build.gradle.kts              # applicationId com.meetngo.app, minSdk 26, targetSdk 34
+│   ├── gradle/libs.versions.toml         # zentraler Gradle Version Catalog
 │   ├── build.gradle.kts                  # AGP 8.5.2, Kotlin 1.9.24
 │   └── gradlew / gradlew.bat
 │
@@ -296,11 +299,12 @@ cd backend && npm test
 
 Backend-Tests laufen gegen eine isolierte In-Memory-SQLite-Datenbank und beeinflussen nie die lokale `meetngo.db`.
 
-Die Android-App wird in CI über einen Debug-APK-Build verifiziert:
-
 ```bash
-cd android && ./gradlew assembleDebug
+cd android && ./gradlew testDebugUnitTest   # Android-Unit-Tests (JUnit, src/test/)
+cd android && ./gradlew assembleDebug       # Debug-APK-Build
 ```
+
+Die Android-Unit-Tests decken reine Kotlin-Logik ohne Android-Framework-Abhängigkeit ab (Datumsformatierung, Fehlermeldungs-Extraktion, JSON-Mapping der Datenmodelle). UI-/Instrumented-Tests (`src/androidTest/`) gibt es bisher nicht.
 
 ## Code-Qualität
 
@@ -315,7 +319,7 @@ pnpm format      # Prettier (Backend)
 Jeder Push und Pull Request auf `master` durchläuft via [GitHub Actions](.github/workflows/ci.yml) zwei Jobs:
 
 - **build-and-test**: `pnpm install` → `pnpm lint` → `pnpm test` (Backend)
-- **android-build**: JDK 17 + Gradle → `./gradlew assembleDebug` (Android Debug-APK)
+- **android-build**: JDK 17 + Gradle → `./gradlew testDebugUnitTest` (Android-Unit-Tests) → `./gradlew assembleDebug` (Android Debug-APK)
 
 ## API-Übersicht
 
@@ -374,6 +378,7 @@ Das Projekt besteht aus zwei Teilen: der **nativen Android-App** und dem **Expre
 
 - **Android ↔ Backend**: Die App spricht ausschließlich über die REST-API (`/api/...`) mit dem Backend. Der Netzwerk-Layer basiert auf Retrofit/OkHttp (`data/api/`); ein OkHttp-Interceptor hängt das JWT automatisch als `Authorization: Bearer …`-Header an jeden Request an. Das Token hält der `AuthRepository`/`ApiClient` als Singleton-Zustand.
 - **UI**: Jetpack Compose mit Navigation Compose (`ui/navigation/NavGraph.kt`), Bottom-Navigation und einem zentralen Compose-Theme (inkl. Dark Mode). Screens liegen nach Feature getrennt unter `ui/screens/`.
+- **ViewModel-Layer**: Die Auth-Screens (`LoginScreen`/`RegisterScreen`) halten ihren UI-Zustand in einem `ViewModel` mit `StateFlow` (`LoginViewModel`, `RegisterViewModel`) statt direkt im Composable — Validierung und API-/Repository-Aufrufe laufen dort, der Composable liest nur noch den Zustand und ruft Aktionen auf. Die übrigen Screens nutzen noch das einfachere Composable-lokale `remember`-Pattern (siehe „Bekannte Verbesserungspunkte").
 - **Karte**: osmdroid mit einer eigenen `XYTileSource`, die auf den Backend-Kachel-Proxy (`/tiles/`) zeigt (siehe oben).
 - **Backend-Schichten**: `server.js` (Prozess-Einstieg, lädt `.env`, startet den Listener) → `app.js` (Express-App, ohne Seiteneffekt testbar) → `routes/` (HTTP-Handler) → `database.js` (SQLite-Zugriff). Diese Trennung erlaubt es, `app.js` in Tests direkt mit Supertest anzusprechen, ohne einen echten Port zu öffnen.
 - **Auth**: JWT im `Authorization: Bearer …`-Header, serverseitig per gemeinsamer Middleware (`middleware/auth.js`) geprüft; Events kennen ihren Ersteller über `organizer_id` für Lösch-Berechtigungen, Tickets ihren Käufer über `user_id`.
@@ -385,3 +390,11 @@ Das UI-Design basiert auf dem Figma-Projekt:
 https://www.figma.com/design/XFbfqoyFt7IFZrnVYUjUzJ/MeetNGo-Mobile-App-UI
 
 Design-Guidelines: siehe [`guidelines/Guidelines.md`](guidelines/Guidelines.md).
+
+## Bekannte Verbesserungspunkte
+
+Nicht alles ist fertig im Sinne von "nichts mehr zu tun" — bewusst zurückgestellte Punkte für eine spätere Iteration:
+
+- **Build-Tooling**: `compileSdk`/`targetSdk = 34`, AGP 8.5.2, Kotlin 1.9.24 und Gradle 8.7 sind Stand Mitte 2024. Für eine echte Veröffentlichung müsste vor allem `targetSdk` auf das aktuelle Android-Level angehoben werden (Play-Store-Vorgabe); ein Wechsel auf Kotlin 2.x ändert zusätzlich, wie der Compose-Compiler eingebunden wird (eigenes Gradle-Plugin statt `kotlinCompilerExtensionVersion`).
+- **Architektur**: Die ViewModel-Schicht ist bisher nur für die Auth-Screens eingeführt (siehe „Architektur" oben); die übrigen Screens (Karte, Suche, Tickets, Event-Erstellung, Organizer-Dashboard, Profil, Scanner) rufen Repository/API-Funktionen weiterhin direkt aus dem Composable auf. Funktioniert für den aktuellen Umfang, eine vollständige Migration auf das Google-empfohlene Pattern wäre der nächste Schritt.
+- **Zahlungsmethoden-Auswahl**: Die Auswahl im Ticket-Kauf-Flow (`EventDetailScreen.kt`) ist bewusst rein dekorativ und ohne echte Zahlungsabwicklung — passend dazu gibt es in der Datenbank kein eigenes `Zahlung`/`Zahlungsmethode`-Modell. Eine echte Zahlungs-Integration wäre der nächste Schritt, falls die App über den Prototyp hinaus weiterentwickelt wird.

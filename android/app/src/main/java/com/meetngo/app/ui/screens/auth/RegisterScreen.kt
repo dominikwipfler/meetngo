@@ -25,11 +25,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -40,19 +38,20 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.NavHostController
 import com.meetngo.app.data.api.ApiService
-import com.meetngo.app.data.model.RegisterRequest
 import com.meetngo.app.data.repository.AuthRepository
 import com.meetngo.app.ui.navigation.Routes
 import com.meetngo.app.ui.theme.MeetNGoColors
-import kotlinx.coroutines.launch
 
 /**
  * Registrierungs-Bildschirm: Benutzername, E-Mail, Passwort und
- * Passwort-Bestätigung. Validiert die Eingaben lokal, bevor der
- * Registrierungs-Endpunkt aufgerufen wird; bei Erfolg wird der Benutzer
- * sofort eingeloggt und zur Kartenansicht weitergeleitet.
+ * Passwort-Bestätigung. Validierung und der Registrierungs-Aufruf liegen im
+ * [RegisterViewModel]; bei Erfolg wird der Benutzer sofort eingeloggt und
+ * zur Kartenansicht weitergeleitet.
  */
 @Composable
 fun RegisterScreen(
@@ -60,42 +59,17 @@ fun RegisterScreen(
     authRepository: AuthRepository,
     apiService: ApiService,
 ) {
-    var username by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordConfirm by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    val viewModel: RegisterViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer { RegisterViewModel(authRepository, apiService) }
+        },
+    )
+    val uiState by viewModel.uiState.collectAsState()
 
-    /** Validiert alle Formularfelder lokal, bevor überhaupt ein Netzwerk-Request ausgelöst wird. */
-    fun handleRegister() {
-        error = ""
-        if (username.isBlank() || email.isBlank() || password.isBlank() || passwordConfirm.isBlank()) {
-            error = "Alle Felder sind erforderlich"
-            return
-        }
-        if (password != passwordConfirm) {
-            error = "Passwörter stimmen nicht überein"
-            return
-        }
-        if (password.length < 6) {
-            error = "Passwort muss mindestens 6 Zeichen lang sein"
-            return
-        }
-        loading = true
-        scope.launch {
-            try {
-                val res = apiService.register(RegisterRequest(username, email, password))
-                // Registrierung loggt direkt ein (Backend liefert bereits ein gültiges Token zurück).
-                authRepository.login(res.token, res.user)
-                navController.navigate(Routes.MAP) {
-                    popUpTo(Routes.LOGIN) { inclusive = true }
-                }
-            } catch (e: Exception) {
-                error = e.toAuthErrorMessage("Registrierung fehlgeschlagen")
-            } finally {
-                loading = false
+    LaunchedEffect(uiState.registered) {
+        if (uiState.registered) {
+            navController.navigate(Routes.MAP) {
+                popUpTo(Routes.LOGIN) { inclusive = true }
             }
         }
     }
@@ -149,8 +123,8 @@ fun RegisterScreen(
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Benutzername", style = MaterialTheme.typography.labelLarge)
                 OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
+                    value = uiState.username,
+                    onValueChange = { viewModel.onUsernameChange(it) },
                     placeholder = { Text("max.mustermann") },
                     singleLine = true,
                     colors = filledFieldColors,
@@ -164,8 +138,8 @@ fun RegisterScreen(
             ) {
                 Text("E-Mail", style = MaterialTheme.typography.labelLarge)
                 OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
+                    value = uiState.email,
+                    onValueChange = { viewModel.onEmailChange(it) },
                     placeholder = { Text("max@example.com") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -180,8 +154,8 @@ fun RegisterScreen(
             ) {
                 Text("Passwort", style = MaterialTheme.typography.labelLarge)
                 OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
+                    value = uiState.password,
+                    onValueChange = { viewModel.onPasswordChange(it) },
                     placeholder = { Text("Mindestens 6 Zeichen") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
@@ -197,22 +171,22 @@ fun RegisterScreen(
             ) {
                 Text("Passwort bestätigen", style = MaterialTheme.typography.labelLarge)
                 OutlinedTextField(
-                    value = passwordConfirm,
-                    onValueChange = { passwordConfirm = it },
+                    value = uiState.passwordConfirm,
+                    onValueChange = { viewModel.onPasswordConfirmChange(it) },
                     placeholder = { Text("••••••••") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { handleRegister() }),
+                    keyboardActions = KeyboardActions(onDone = { viewModel.register() }),
                     colors = filledFieldColors,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
 
             // Fehlertext: lokale Validierungsfehler oder Backend-Fehlermeldung.
-            if (error.isNotBlank()) {
+            if (uiState.error.isNotBlank()) {
                 Text(
-                    text = error,
+                    text = uiState.error,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(top = 12.dp),
                 )
@@ -220,12 +194,12 @@ fun RegisterScreen(
 
             // Submit-Button: zeigt während des Requests einen Lade-Indikator statt des Labels.
             Button(
-                onClick = { handleRegister() },
-                enabled = !loading,
+                onClick = { viewModel.register() },
+                enabled = !uiState.loading,
                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MeetNGoColors.BrandCoral),
             ) {
-                if (loading) {
+                if (uiState.loading) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp))
                 } else {
                     Text("Konto erstellen")

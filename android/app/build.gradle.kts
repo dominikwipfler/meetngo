@@ -1,6 +1,6 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -20,7 +20,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
+        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
     }
 
     compileOptions {
@@ -33,42 +33,42 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
-    implementation("androidx.activity:activity-compose:1.9.1")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.activity.compose)
 
-    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material:material-icons-extended")
-    debugImplementation("androidx.compose.ui:ui-tooling")
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material.icons.extended)
+    debugImplementation(libs.androidx.compose.ui.tooling)
 
-    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation(libs.androidx.navigation.compose)
 
     // Networking
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation(libs.retrofit.core)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp.logging.interceptor)
 
     // Auth storage
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation(libs.androidx.datastore.preferences)
 
     // Maps
-    implementation("org.osmdroid:osmdroid-android:6.1.18")
+    implementation(libs.osmdroid.android)
 
     // QR codes (generation + decoding of scanned camera frames)
-    implementation("com.google.zxing:core:3.5.3")
+    implementation(libs.zxing.core)
 
     // Camera (QR scanning)
-    implementation("androidx.camera:camera-core:1.3.4")
-    implementation("androidx.camera:camera-camera2:1.3.4")
-    implementation("androidx.camera:camera-lifecycle:1.3.4")
-    implementation("androidx.camera:camera-view:1.3.4")
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
 
     // Image loading
-    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation(libs.coil.compose)
 
-    // Image picker
-    implementation("androidx.activity:activity-compose:1.9.1")
+    testImplementation(libs.junit)
 }
