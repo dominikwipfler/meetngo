@@ -65,11 +65,11 @@ Alternativ `android/` in Android Studio öffnen und die App auf einem Emulator s
 
 - **Authentifizierung** — Registrierung & Login mit JWT, Passwörter werden mit bcrypt gehasht
 - **Kartenansicht** — Events als farbcodierte Marker nach Kategorie auf einer interaktiven OpenStreetMap-Karte (osmdroid), deren Kacheln über einen lokalen Backend-Proxy geladen werden
-- **Suche & Filter** — Volltextsuche, Kategorie-Filter, Preisfilter (kostenlos/kostenpflichtig), Sortierung nach Datum, Name, Beliebtheit oder Preis
+- **Suche & Filter** — Volltextsuche, Kategorie-Filter, Preisfilter (kostenlos/kostenpflichtig sowie Maximalpreis), Zeitfenster-Filter (z. B. „Heute"/„Wochenende"), Sortierung nach Datum, Name, Beliebtheit oder Preis; serverseitige Pagination (`X-Total-Count`)
 - **Event-Details** — Detailansicht mit Ticket-Kauf-Flow (Mengenwahl, Zahlungsmethoden-Auswahl)
 - **Echtes Ticket-System** — Tickets werden serverseitig angelegt (eigene `tickets`-Tabelle, an Event und Käufer gebunden), Kapazitätsgrenzen werden respektiert, Teilnehmerzahl wird automatisch hochgezählt
 - **Tickets mit QR-Code** — jedes Ticket erzeugt einen echten, scanbaren QR-Code (in der App generiert, kein externer Dienst); ein integrierter Scanner ermöglicht den Check-in
-- **Eigene Events erstellen** — inkl. Bild-Upload (JPG/PNG/WebP, max. 5 MB), Kategorie, Preis, Kapazität
+- **Eigene Events erstellen** — inkl. Bild-Upload (JPG/PNG/WebP, max. 5 MB), Kategorie, Preis, Kapazität und Adresssuche (Geocoding über einen Backend-Proxy zu Nominatim/OpenStreetMap, ohne API-Key)
 - **Favoriten & Folgen** — Events favorisieren und Veranstaltern folgen
 - **Organizer-Dashboard** — Statistiken und Verwaltung der eigenen Events
 - **Profil & Einstellungen** — Benutzername, E-Mail und Interessen werden serverseitig gespeichert (`PATCH /api/users/me`), Passwortänderung, Dark Mode
@@ -105,6 +105,7 @@ Die Vorgaben verlangten fünf Kernfunktionen plus gutes Design. Umgesetzt wurde 
 - Die Karte nutzt **osmdroid** mit OpenStreetMap-Kacheln. Im Emulator-Setup kann der Emulator jedoch keine externen DNS-Namen auflösen — die Kacheln von `tile.openstreetmap.org` würden nie ankommen und die Karte bliebe grau.
 - Lösung: Ein **lokaler Kachel-Proxy** im Backend (`backend/routes/tiles.js`) holt die Kacheln über den Host (mit Internet) und reicht sie an die App durch — erreichbar über `10.0.2.2:3001/tiles/:z/:x/:y.png`. Die App setzt diese URL als osmdroid-`XYTileSource` (siehe `MapScreen.kt`).
 - Der Proxy validiert die `z/x/y`-Koordinaten (Schutz vor Path-Traversal/SSRF), sendet einen aussagekräftigen `User-Agent` (von der OSM-Nutzungsrichtlinie verlangt) und legt die Kacheln in einem **Festplatten-Cache** (`backend/tiles-cache/`) ab, damit der OSM-Server nicht bei jedem Karten-Schwenk neu angefragt wird.
+- Aus demselben Grund läuft auch die **Adresssuche** beim Event-Erstellen über einen Backend-Proxy (`backend/routes/geocode.js`, `GET /api/geocode?q=…`): Das Backend reicht die Anfrage an Nominatim (OpenStreetMap) durch und liefert Treffer mit Koordinaten zurück — kein API-Key, und im Emulator funktionsfähig, der den externen Host selbst nicht auflösen könnte.
 
 #### 🔐 Sicherheit, die über "Login klappt" hinausgeht
 
@@ -127,7 +128,7 @@ Die Vorgaben verlangten fünf Kernfunktionen plus gutes Design. Umgesetzt wurde 
 
 #### ✅ Qualitätssicherung, wie sie in echten Projekten verlangt wird
 
-- **Automatisierte Backend-Tests** mit Vitest + Supertest (`auth`, `events`, `tickets`, `users`, `price`, `tiles`, `rateLimit`, `securityHeaders`) gegen eine isolierte In-Memory-SQLite-Datenbank, die nie die lokale `meetngo.db` berührt.
+- **Automatisierte Backend-Tests** mit Vitest + Supertest (129 Tests über `auth`, `authMiddleware`, `events`, `tickets`, `users`, `geocode`, `price`, `tiles`, `rateLimit`, `securityHeaders` und `edgeCases`) gegen eine isolierte In-Memory-SQLite-Datenbank, die nie die lokale `meetngo.db` berührt.
 - **GitHub-Actions-CI-Pipeline** (`.github/workflows/ci.yml`): Jeder Push und Pull Request durchläuft automatisch Install → Lint → Test für das Backend sowie einen Debug-APK-Build der Android-App.
 
 ## Tech-Stack
@@ -183,7 +184,8 @@ meetngo/
 │   │   ├── events.js                     # CRUD /api/events + Favoriten
 │   │   ├── tickets.js                    # /api/tickets + Check-in
 │   │   ├── users.js                      # /api/users/me + Folgen
-│   │   └── tiles.js                      # OSM-Kachel-Proxy (/tiles/:z/:x/:y.png)
+│   │   ├── tiles.js                      # OSM-Kachel-Proxy (/tiles/:z/:x/:y.png)
+│   │   └── geocode.js                    # Adresssuche-Proxy zu Nominatim (/api/geocode)
 │   ├── tests/                            # Vitest + Supertest (isolierte In-Memory-DB)
 │   ├── uploads/                          # Hochgeladene Event-Bilder (gitignored)
 │   ├── tiles-cache/                      # Festplatten-Cache des Kachel-Proxys (gitignored)
@@ -346,6 +348,7 @@ Das Backend läuft auf `http://localhost:3001` (vom Emulator als `http://10.0.2.
 | PATCH | `/api/users/me/password` | Passwort ändern (Auth) |
 | GET | `/api/users/:id/follow-status` | Folge-Status eines Veranstalters (Auth) |
 | POST/DELETE | `/api/users/:id/follow` | Veranstalter folgen / entfolgen (Auth) |
+| GET | `/api/geocode` | Adresssuche (Proxy zu Nominatim/OSM, `?q=`), gibt Treffer mit Koordinaten zurück |
 | GET | `/tiles/:z/:x/:y.png` | OSM-Kachel-Proxy für die Karte |
 | GET | `/uploads/:file` | Statisch ausgelieferte Event-Bilder |
 
@@ -358,7 +361,12 @@ Das Backend läuft auf `http://localhost:3001` (vom Emulator als `http://10.0.2.
 | `sort` | `date`, `name`, `attendees`, `price` | Sortierfeld (`price` sortiert numerisch über die interne `price_value`-Spalte) |
 | `order` | `asc`, `desc` | Sortierreihenfolge |
 | `priceFilter` | `free`, `paid` | Kostenlos / Kostenpflichtig |
+| `priceMax` | Zahl | Maximaler Ticketpreis (numerisch über `price_value`); `0`/leer = kein Limit |
+| `dateFrom` | ISO-Datum | Frühestes Veranstaltungsdatum (z. B. `2026-06-23T00:00:00`) |
+| `dateTo` | ISO-Datum | Spätestes Veranstaltungsdatum |
 | `organizerId` | Zahl | Nur Events eines bestimmten Veranstalters |
+| `limit` | Zahl (max. 100) | Pagination: max. Anzahl Treffer; ohne Angabe wird die volle Liste geliefert |
+| `offset` | Zahl | Pagination: Anzahl übersprungener Treffer (Gesamtzahl steht im `X-Total-Count`-Header) |
 
 ## Datenbank
 
