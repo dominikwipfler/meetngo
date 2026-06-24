@@ -47,6 +47,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -63,8 +65,16 @@ import kotlinx.coroutines.launch
 
 /** Kategorien, aus denen der Benutzer seine persönlichen Interessen auswählen kann. */
 private val availableInterests = listOf(
-    "Musik", "Sport", "Kunst", "Food", "Tech", "Outdoor", "Theater", "Kino", "Gaming", "Literatur",
+    "Musik", "Sport", "Kunst", "Food", "Tech", "Outdoor",
+    "Familie", "Bildung", "Markt", "Stadtleben", "Nightlife",
+    "Theater", "Kino", "Gaming", "Literatur", "Reisen", "Fotografie",
 )
+
+/** Identifiziert das Feld, auf das sich der Profil-Speichern-Fehler bezieht (für Feld-Markierung + Fokus). */
+private enum class ProfileField { USERNAME, EMAIL }
+
+/** Identifiziert das Feld, auf das sich der Passwort-Dialog-Fehler bezieht. */
+private enum class PasswordField { CURRENT, NEW, CONFIRM }
 
 /**
  * Einstellungen des Benutzers: Profilfelder (Name/E-Mail/Passwort), Interessen,
@@ -81,7 +91,10 @@ fun ProfileSettingsScreen(
     var email by remember { mutableStateOf("") }
     var selectedInterests by remember { mutableStateOf<List<String>>(emptyList()) }
     var error by remember { mutableStateOf("") }
+    var errorField by remember { mutableStateOf<ProfileField?>(null) }
     var saving by remember { mutableStateOf(false) }
+    val usernameFocusRequester = remember { FocusRequester() }
+    val emailFocusRequester = remember { FocusRequester() }
     // Benachrichtigungs-Einstellungen werden lokal in DataStore persistiert (kein Backend-Endpunkt),
     // damit die Schalter ihren Zustand über App-Neustarts hinweg behalten.
     val eventReminders by ThemeState.eventReminders.collectAsState()
@@ -91,6 +104,7 @@ fun ProfileSettingsScreen(
     var newPw by remember { mutableStateOf("") }
     var confirmPw by remember { mutableStateOf("") }
     var pwError by remember { mutableStateOf("") }
+    var pwErrorField by remember { mutableStateOf<PasswordField?>(null) }
     var pwSaving by remember { mutableStateOf(false) }
     var pwSuccess by remember { mutableStateOf(false) }
     val darkModeOverride by ThemeState.darkModeOverride.collectAsState()
@@ -121,16 +135,20 @@ fun ProfileSettingsScreen(
     /** Validiert die Passwort-Eingaben lokal und ruft anschließend den Passwort-Ändern-Endpunkt auf. */
     fun handleChangePassword() {
         pwError = ""
+        pwErrorField = null
         if (currentPw.isBlank()) {
             pwError = "Bitte aktuelles Passwort eingeben"
+            pwErrorField = PasswordField.CURRENT
             return
         }
         if (newPw.length < 6) {
             pwError = "Passwort muss mindestens 6 Zeichen lang sein"
+            pwErrorField = PasswordField.NEW
             return
         }
         if (newPw != confirmPw) {
             pwError = "Passwörter stimmen nicht überein"
+            pwErrorField = PasswordField.CONFIRM
             return
         }
         pwSaving = true
@@ -144,6 +162,7 @@ fun ProfileSettingsScreen(
                 pwSuccess = true
             } catch (e: Exception) {
                 pwError = e.toAuthErrorMessage("Passwort konnte nicht geändert werden")
+                pwErrorField = PasswordField.CURRENT
             } finally {
                 pwSaving = false
             }
@@ -153,6 +172,19 @@ fun ProfileSettingsScreen(
     /** Speichert Username/E-Mail/Interessen, aktualisiert die lokal zwischengespeicherten Benutzerdaten und kehrt zum Profil zurück. */
     fun handleSave() {
         error = ""
+        errorField = null
+        if (username.isBlank()) {
+            error = "Bitte einen Benutzernamen eingeben"
+            errorField = ProfileField.USERNAME
+            usernameFocusRequester.requestFocus()
+            return
+        }
+        if (email.isBlank()) {
+            error = "Bitte eine E-Mail-Adresse eingeben"
+            errorField = ProfileField.EMAIL
+            emailFocusRequester.requestFocus()
+            return
+        }
         saving = true
         scope.launch {
             try {
@@ -166,7 +198,14 @@ fun ProfileSettingsScreen(
                 authRepository.updateUser(updated)
                 navController.popBackStack(Routes.PROFILE, inclusive = false)
             } catch (e: Exception) {
-                error = e.toAuthErrorMessage("Speichern fehlgeschlagen")
+                val message = e.toAuthErrorMessage("Speichern fehlgeschlagen")
+                error = message
+                // Konflikt-Nachrichten kommen wortgleich vom Backend (siehe backend/utils/dbErrors.js).
+                errorField = when (message) {
+                    "Benutzername bereits vergeben" -> ProfileField.USERNAME
+                    "E-Mail-Adresse bereits registriert" -> ProfileField.EMAIL
+                    else -> null
+                }
             } finally {
                 saving = false
             }
@@ -197,7 +236,9 @@ fun ProfileSettingsScreen(
                     value = username,
                     onValueChange = { username = it },
                     label = { Text(text = "Benutzername") },
-                    modifier = Modifier.fillMaxWidth(),
+                    isError = errorField == ProfileField.USERNAME,
+                    supportingText = { if (errorField == ProfileField.USERNAME) Text(error) },
+                    modifier = Modifier.fillMaxWidth().focusRequester(usernameFocusRequester),
                     singleLine = true,
                 )
 
@@ -205,7 +246,9 @@ fun ProfileSettingsScreen(
                     value = email,
                     onValueChange = { email = it },
                     label = { Text(text = "E-Mail") },
-                    modifier = Modifier.fillMaxWidth(),
+                    isError = errorField == ProfileField.EMAIL,
+                    supportingText = { if (errorField == ProfileField.EMAIL) Text(error) },
+                    modifier = Modifier.fillMaxWidth().focusRequester(emailFocusRequester),
                     singleLine = true,
                 )
 
@@ -213,6 +256,7 @@ fun ProfileSettingsScreen(
                     onClick = {
                         pwSuccess = false
                         pwError = ""
+                        pwErrorField = null
                         showPasswordDialog = true
                     },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -283,7 +327,9 @@ fun ProfileSettingsScreen(
                 )
             }
 
-            if (error.isNotBlank()) {
+            // Bei Benutzername-/E-Mail-Fehlern steht die Meldung bereits als supportingText am
+            // betroffenen Feld; hier nur für sonstige Fehler (z. B. Netzwerk).
+            if (error.isNotBlank() && errorField == null) {
                 Text(text = error, color = MaterialTheme.colorScheme.error)
             }
 
@@ -313,6 +359,7 @@ fun ProfileSettingsScreen(
                         label = { Text("Aktuelles Passwort") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
+                        isError = pwErrorField == PasswordField.CURRENT,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
@@ -321,6 +368,7 @@ fun ProfileSettingsScreen(
                         label = { Text("Neues Passwort") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
+                        isError = pwErrorField == PasswordField.NEW,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
@@ -329,6 +377,7 @@ fun ProfileSettingsScreen(
                         label = { Text("Neues Passwort bestätigen") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
+                        isError = pwErrorField == PasswordField.CONFIRM,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     if (pwError.isNotBlank()) {

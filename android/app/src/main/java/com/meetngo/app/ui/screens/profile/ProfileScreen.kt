@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -93,6 +94,9 @@ fun ProfileScreen(
     var followers by remember { mutableStateOf(0) }
     var favoritesCount by remember { mutableStateOf(0) }
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showDeleteAccountDialog by remember { mutableStateOf(false) }
+    var deletingAccount by remember { mutableStateOf(false) }
+    var deleteAccountError by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     // Lädt alle Profil-bezogenen Daten unabhängig voneinander, damit ein einzelner fehlschlagender
@@ -116,6 +120,29 @@ fun ProfileScreen(
             authRepository.logout()
             navController.navigate(Routes.LOGIN) {
                 popUpTo(0) { inclusive = true }
+            }
+        }
+    }
+
+    /**
+     * Löscht das Konto serverseitig endgültig, beendet danach die lokale Sitzung und navigiert
+     * zum Login. Schlägt der Server-Request fehl, bleibt der Nutzer eingeloggt und es wird ein
+     * Fehler im Dialog angezeigt.
+     */
+    fun handleDeleteAccount() {
+        deleteAccountError = ""
+        deletingAccount = true
+        scope.launch {
+            try {
+                apiService.deleteAccount()
+                authRepository.logout()
+                navController.navigate(Routes.LOGIN) {
+                    popUpTo(0) { inclusive = true }
+                }
+            } catch (e: Exception) {
+                deleteAccountError = "Konto konnte nicht gelöscht werden. Bitte versuche es erneut."
+            } finally {
+                deletingAccount = false
             }
         }
     }
@@ -308,9 +335,20 @@ fun ProfileScreen(
 
             OutlinedButton(
                 onClick = { showLogoutDialog = true },
-                modifier = Modifier.fillMaxWidth().padding(top = 32.dp, bottom = 24.dp).height(48.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 32.dp).height(48.dp),
             ) {
                 Text(text = "Ausloggen", color = MeetNGoColors.Destructive)
+            }
+
+            TextButton(
+                onClick = {
+                    deleteAccountError = ""
+                    showDeleteAccountDialog = true
+                },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp).height(48.dp),
+            ) {
+                Icon(Icons.Filled.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp), tint = MeetNGoColors.Destructive)
+                Text(text = " Konto löschen", color = MeetNGoColors.Destructive)
             }
         }
     }
@@ -327,6 +365,52 @@ fun ProfileScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) { Text(text = "Nein") }
+            },
+        )
+    }
+
+    if (showDeleteAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!deletingAccount) showDeleteAccountDialog = false },
+            icon = {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(MeetNGoColors.Destructive.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.DeleteForever, contentDescription = null, tint = MeetNGoColors.Destructive)
+                }
+            },
+            title = { Text(text = "Konto löschen?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Dein Konto und alle zugehörigen Daten – deine Events, Tickets und Favoriten – " +
+                            "werden endgültig gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
+                    )
+                    if (deleteAccountError.isNotBlank()) {
+                        Text(
+                            text = deleteAccountError,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { handleDeleteAccount() }, enabled = !deletingAccount) {
+                    Text(
+                        text = if (deletingAccount) "Wird gelöscht..." else "Endgültig löschen",
+                        color = MeetNGoColors.Destructive,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteAccountDialog = false }, enabled = !deletingAccount) {
+                    Text(text = "Abbrechen")
+                }
             },
         )
     }

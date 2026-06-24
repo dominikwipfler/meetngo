@@ -24,9 +24,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -73,6 +76,16 @@ fun LoginScreen(
         }
     }
 
+    val emailFocusRequester = remember { FocusRequester() }
+    val passwordFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(uiState.errorField) {
+        when (uiState.errorField) {
+            LoginField.EMAIL -> emailFocusRequester.requestFocus()
+            LoginField.PASSWORD -> passwordFocusRequester.requestFocus()
+            null -> {}
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             modifier = Modifier
@@ -116,7 +129,8 @@ fun LoginScreen(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                     colors = filledFieldColors,
-                    modifier = Modifier.fillMaxWidth(),
+                    isError = uiState.errorField == LoginField.EMAIL,
+                    modifier = Modifier.fillMaxWidth().focusRequester(emailFocusRequester),
                 )
             }
 
@@ -135,7 +149,8 @@ fun LoginScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { viewModel.login() }),
                     colors = filledFieldColors,
-                    modifier = Modifier.fillMaxWidth(),
+                    isError = uiState.errorField == LoginField.PASSWORD,
+                    modifier = Modifier.fillMaxWidth().focusRequester(passwordFocusRequester),
                 )
             }
 

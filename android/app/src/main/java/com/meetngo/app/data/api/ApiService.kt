@@ -28,6 +28,9 @@ interface ApiService {
      * @param sort Feld, nach dem sortiert wird (z. B. "date", "price").
      * @param order Sortierrichtung ("asc"/"desc").
      * @param priceFilter Preisfilter, z. B. "free" für kostenlose Events.
+     * @param priceMax Maximaler Ticketpreis (numerisch); `null`/0 bedeutet kein Limit.
+     * @param dateFrom Frühestes Veranstaltungsdatum als ISO-String (z. B. "2026-06-23T00:00:00").
+     * @param dateTo Spätestes Veranstaltungsdatum als ISO-String.
      * @param organizerId Liefert nur Events eines bestimmten Veranstalters.
      */
     @GET("api/events")
@@ -37,12 +40,19 @@ interface ApiService {
         @Query("sort") sort: String? = null,
         @Query("order") order: String? = null,
         @Query("priceFilter") priceFilter: String? = null,
+        @Query("priceMax") priceMax: Int? = null,
+        @Query("dateFrom") dateFrom: String? = null,
+        @Query("dateTo") dateTo: String? = null,
         @Query("organizerId") organizerId: Int? = null,
     ): List<Event>
 
     /** Lädt die Detaildaten einer einzelnen Veranstaltung anhand ihrer ID. */
     @GET("api/events/{id}")
     suspend fun getEvent(@Path("id") id: Int): Event
+
+    /** Sucht passende Adressvorschläge (inkl. Koordinaten) für eine Freitext-Adresseingabe. */
+    @GET("api/geocode")
+    suspend fun geocode(@Query("q") q: String): List<GeocodeResult>
 
     /**
      * Erstellt eine neue Veranstaltung als Multipart-Request, damit optional
@@ -110,6 +120,10 @@ interface ApiService {
     /** Ändert das Passwort des eingeloggten Benutzers (erfordert i. d. R. das aktuelle Passwort im Body). */
     @PATCH("api/users/me/password")
     suspend fun changePassword(@Body body: ChangePasswordRequest)
+
+    /** Löscht das Konto des eingeloggten Benutzers samt aller abhängigen Daten (Events, Tickets, Favoriten). */
+    @DELETE("api/users/me")
+    suspend fun deleteAccount()
 
     /** Prüft, ob der eingeloggte Benutzer dem Veranstalter mit der gegebenen ID folgt. */
     @GET("api/users/{id}/follow-status")

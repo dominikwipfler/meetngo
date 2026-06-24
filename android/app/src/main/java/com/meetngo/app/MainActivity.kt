@@ -2,6 +2,11 @@ package com.meetngo.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -147,7 +152,16 @@ fun AppNavHost(
     apiService: ApiService,
     startDestination: String,
 ) {
-    NavHost(navController = navController, startDestination = startDestination) {
+    // Sanfte, einheitliche Übergänge zwischen allen Screens: ein dezentes Ein-/Ausblenden mit
+    // leichtem Zoom wirkt hochwertig und gibt dem Öffnen von Detailseiten einen "Hero"-Charakter.
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
+        enterTransition = { fadeIn(tween(220)) + scaleIn(initialScale = 0.94f, animationSpec = tween(220)) },
+        exitTransition = { fadeOut(tween(160)) },
+        popEnterTransition = { fadeIn(tween(220)) },
+        popExitTransition = { fadeOut(tween(160)) + scaleOut(targetScale = 0.96f, animationSpec = tween(160)) },
+    ) {
         composable(Routes.LOGIN) {
             LoginScreen(navController = navController, authRepository = authRepository, apiService = apiService)
         }

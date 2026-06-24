@@ -55,6 +55,23 @@ describe("GET /api/events", () => {
     expect(res.body.some((e) => e.name.includes("Jazz"))).toBe(true);
   });
 
+  it("filters by a maximum price", async () => {
+    const res = await request(app).get("/api/events?priceMax=10");
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeGreaterThan(0);
+    expect(res.body.every((e) => e.price_value <= 10)).toBe(true);
+    // Ein teures Event (Marathon, 45 €) darf hier nicht auftauchen.
+    expect(res.body.some((e) => e.name === "Marathon 2026")).toBe(false);
+  });
+
+  it("filters by a date range (dateFrom/dateTo)", async () => {
+    const res = await request(app).get("/api/events?dateFrom=2026-08-01T00:00:00&dateTo=2026-08-31T23:59:59");
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeGreaterThan(0);
+    // Alle Treffer liegen im August 2026.
+    expect(res.body.every((e) => e.date >= "2026-08-01" && e.date <= "2026-08-31T23:59:59")).toBe(true);
+  });
+
   it("paginates with limit/offset and reports the full count in X-Total-Count", async () => {
     const all = await request(app).get("/api/events");
     const total = all.body.length;

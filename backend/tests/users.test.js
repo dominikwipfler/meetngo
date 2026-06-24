@@ -174,6 +174,60 @@ describe("Follow / Abonnenten", () => {
   });
 });
 
+describe("DELETE /api/users/me", () => {
+  it("rejects unauthenticated requests", async () => {
+    const res = await request(app).delete("/api/users/me");
+    expect(res.status).toBe(401);
+  });
+
+  it("deletes the account and prevents logging in afterwards", async () => {
+    const suffix = "del_ok";
+    const { token } = await registerUser(suffix);
+    const email = `profileuser_${suffix}@example.com`;
+
+    const del = await request(app)
+      .delete("/api/users/me")
+      .set("Authorization", `Bearer ${token}`);
+    expect(del.status).toBe(200);
+    expect(del.body).toEqual({ success: true });
+
+    // The credentials no longer work because the user row is gone.
+    const login = await request(app)
+      .post("/api/auth/login")
+      .send({ email, password: "password123" });
+    expect(login.status).toBe(401);
+
+    // The (now invalid) token can no longer access protected resources.
+    const profile = await request(app)
+      .get("/api/users/me")
+      .set("Authorization", `Bearer ${token}`);
+    expect(profile.status).toBe(404);
+  });
+
+  it("removes the user's tickets along with the account", async () => {
+    const { token, userId } = await registerUser("del_tickets");
+
+    // Buy a ticket for a seeded event, then delete the account.
+    const ticket = await request(app)
+      .post("/api/tickets")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ eventId: 1 });
+    expect(ticket.status).toBe(201);
+
+    const del = await request(app)
+      .delete("/api/users/me")
+      .set("Authorization", `Bearer ${token}`);
+    expect(del.status).toBe(200);
+
+    // No ticket rows remain for the deleted user.
+    const db = require("../database");
+    const remaining = db
+      .prepare("SELECT COUNT(*) AS c FROM tickets WHERE user_id = ?")
+      .get(userId).c;
+    expect(remaining).toBe(0);
+  });
+});
+
 describe("PATCH /api/users/me/password", () => {
   it("rejects unauthenticated requests", async () => {
     const res = await request(app)

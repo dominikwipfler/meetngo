@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,24 +20,23 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -56,20 +57,19 @@ import coil.compose.AsyncImage
 import com.meetngo.app.data.api.ApiService
 import com.meetngo.app.data.api.BASE_URL
 import com.meetngo.app.data.model.Event
+import com.meetngo.app.ui.components.EventCardSkeleton
+import com.meetngo.app.ui.components.EventFilterSheet
+import com.meetngo.app.ui.components.EventFilters
+import com.meetngo.app.ui.components.FilterButtonWithBadge
+import com.meetngo.app.ui.components.SORT_OPTIONS
+import com.meetngo.app.ui.components.resolveDateRange
 import com.meetngo.app.ui.navigation.Routes
 import com.meetngo.app.ui.theme.MeetNGoColors
 import com.meetngo.app.util.formatDateMedium
 
-private val CATEGORIES = listOf("Alle", "Musik", "Sport", "Kunst", "Food", "Tech", "Outdoor")
-
-/** Verknüpft den für die API benötigten Sortier-Wert mit seinem deutschen Anzeigelabel. */
-private data class SortOption(val value: String, val label: String)
-
-private val SORT_OPTIONS = listOf(
-    SortOption("date", "Datum"),
-    SortOption("name", "Name"),
-    SortOption("attendees", "Beliebtheit"),
-    SortOption("price", "Preis"),
+private val CATEGORIES = listOf(
+    "Alle", "Musik", "Sport", "Kunst", "Food", "Tech", "Outdoor",
+    "Familie", "Bildung", "Markt", "Stadtleben", "Nightlife", "Sonstiges",
 )
 
 /** Baut aus einem relativen Backend-Pfad eine vollständige Bild-URL; absolute URLs werden unverändert übernommen. */
@@ -82,48 +82,63 @@ private fun imageUrl(imagePath: String?): String? {
 
 /**
  * Such- und Filterbildschirm für Veranstaltungen: Freitextsuche, Kategorie-Chips
- * sowie ein Bottom-Sheet mit Sortierung, Reihenfolge und Preisfilter.
+ * sowie ein Bottom-Sheet mit Sortierung, Reihenfolge und Preisfilter (siehe
+ * [com.meetngo.app.ui.components.EventFilterSheet], auch von [com.meetngo.app.ui.screens.map.MapScreen] genutzt).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(navController: NavHostController, apiService: ApiService) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("Alle") }
-    var sort by remember { mutableStateOf("date") }
-    var order by remember { mutableStateOf("asc") }
-    var priceFilter by remember { mutableStateOf("") } // "", "free", "paid"
+    var filters by remember { mutableStateOf(EventFilters()) }
     var showFilterSheet by remember { mutableStateOf(false) }
 
     var events by remember { mutableStateOf<List<Event>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // Wird hochgezählt, um einen erneuten Ladeversuch auszulösen (Retry-Button / Pull-to-Refresh).
+    var reloadKey by remember { mutableStateOf(0) }
+    val pullState = rememberPullToRefreshState()
 
-    // Zählt nur "von der Standardeinstellung abweichende" Filter, damit das Badge nicht ständig "3" zeigt.
-    val activeFilterCount = listOf(priceFilter.isNotEmpty(), sort != "date", order != "asc").count { it }
-
-    // Lädt die Events bei jeder Änderung eines Filters neu; das Debounce (delay) verhindert
-    // einen Request pro Tastenanschlag bei der Freitextsuche.
-    LaunchedEffect(searchQuery, selectedCategory, sort, order, priceFilter) {
-        loading = true
-        kotlinx.coroutines.delay(300)
+    // Gemeinsame Ladefunktion für die Debounce-Suche, den Retry-Button und Pull-to-Refresh.
+    suspend fun loadEvents() {
         error = null
         try {
+            val (dateFrom, dateTo) = filters.resolveDateRange()
             events = apiService.getEvents(
                 search = searchQuery.ifBlank { null },
                 category = if (selectedCategory == "Alle") null else selectedCategory,
-                sort = sort,
-                order = order,
-                priceFilter = priceFilter.ifBlank { null },
+                sort = filters.sort,
+                order = filters.order,
+                priceFilter = filters.priceFilter.ifBlank { null },
+                priceMax = filters.maxPrice.takeIf { it > 0 },
+                dateFrom = dateFrom,
+                dateTo = dateTo,
             )
         } catch (e: Exception) {
             events = emptyList()
             error = "Fehler beim Laden der Events"
-        } finally {
-            loading = false
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    // Lädt die Events bei jeder Änderung eines Filters neu; das Debounce (delay) verhindert
+    // einen Request pro Tastenanschlag bei der Freitextsuche.
+    LaunchedEffect(searchQuery, selectedCategory, filters, reloadKey) {
+        loading = true
+        kotlinx.coroutines.delay(300)
+        loadEvents()
+        loading = false
+    }
+
+    // Pull-to-Refresh: lädt die aktuelle Trefferliste neu und beendet danach die Wisch-Animation.
+    LaunchedEffect(pullState.isRefreshing) {
+        if (pullState.isRefreshing) {
+            loadEvents()
+            pullState.endRefresh()
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().imePadding()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -131,18 +146,7 @@ fun SearchScreen(navController: NavHostController, apiService: ApiService) {
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.weight(1f),
                 )
-                BadgedBox(
-                    badge = {
-                        if (activeFilterCount > 0) {
-                            Badge(containerColor = MeetNGoColors.BrandCoral) { Text("$activeFilterCount") }
-                        }
-                    },
-                ) {
-                    OutlinedButton(onClick = { showFilterSheet = true }) {
-                        Icon(Icons.Filled.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text(" Filter")
-                    }
-                }
+                FilterButtonWithBadge(activeCount = filters.activeCount, onClick = { showFilterSheet = true })
             }
 
             OutlinedTextField(
@@ -150,7 +154,19 @@ fun SearchScreen(navController: NavHostController, apiService: ApiService) {
                 onValueChange = { searchQuery = it },
                 placeholder = { Text("Events, Orte, Kategorien...") },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Suche zurücksetzen")
+                        }
+                    }
+                },
                 singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MeetNGoColors.BrandTeal,
+                    focusedLeadingIconColor = MeetNGoColors.BrandTeal,
+                ),
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             )
 
@@ -161,17 +177,19 @@ fun SearchScreen(navController: NavHostController, apiService: ApiService) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 CATEGORIES.forEach { category ->
+                    val selected = selectedCategory == category
                     FilterChip(
-                        selected = selectedCategory == category,
+                        selected = selected,
                         onClick = { selectedCategory = category },
                         label = { Text(category) },
+                        shape = RoundedCornerShape(50),
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MeetNGoColors.BrandTeal,
                             selectedLabelColor = Color.White,
                         ),
                         border = FilterChipDefaults.filterChipBorder(
                             enabled = true,
-                            selected = selectedCategory == category,
+                            selected = selected,
                             borderColor = MaterialTheme.colorScheme.outline,
                             selectedBorderColor = MeetNGoColors.BrandTeal,
                         ),
@@ -179,153 +197,115 @@ fun SearchScreen(navController: NavHostController, apiService: ApiService) {
                 }
             }
 
+            // Kompakte, antippbare Zusammenfassung der aktiven Sortierung; öffnet das Filter-Sheet.
             Row(
                 modifier = Modifier
                     .padding(top = 12.dp)
-                    .clickable { showFilterSheet = true },
+                    .clip(RoundedCornerShape(50))
+                    .background(MeetNGoColors.BrandTeal.copy(alpha = 0.10f))
+                    .clickable { showFilterSheet = true }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    "Sortiert nach:",
-                    style = MaterialTheme.typography.bodySmall,
+                    "Sortiert nach",
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    "${SORT_OPTIONS.first { it.value == sort }.label} (${if (order == "asc") "↑" else "↓"})",
-                    style = MaterialTheme.typography.bodySmall,
+                    "${SORT_OPTIONS.first { it.value == filters.sort }.label} ${if (filters.order == "asc") "↑" else "↓"}",
+                    style = MaterialTheme.typography.labelMedium,
                     color = MeetNGoColors.BrandTeal,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }
 
-        if (loading) {
-            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else if (error != null) {
-            Text(
-                error ?: "",
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(16.dp),
-            )
-        } else {
-            Text(
-                "${events.size} Event${if (events.size != 1) "s" else ""} gefunden",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-
-            if (events.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Keine Events gefunden", style = MaterialTheme.typography.bodyMedium)
+        // Ergebnisbereich bekommt die verbleibende Höhe als begrenzte weight-Fläche. Wichtig: ein
+        // LazyColumn darf nicht mit fillMaxSize direkt in einer nicht begrenzten Column liegen –
+        // beim Ein-/Ausblenden der Tastatur (IME-Inset-Animation) führt das sonst zu einer
+        // Remeasure-Lawine, die den Main-Thread blockiert (ANR beim Tippen ins Suchfeld).
+        // nestedScroll verbindet die Liste mit dem Pull-to-Refresh.
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .nestedScroll(pullState.nestedScrollConnection),
+        ) {
+            // Beim ersten Laden Skeleton-Platzhalter zeigen; beim Pull-to-Refresh übernimmt der
+            // PullToRefreshContainer die Lade-Anzeige, daher dann keine Skeletons.
+            val showSkeletons = loading && !pullState.isRefreshing
+            when {
+                showSkeletons -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        repeat(5) { EventCardSkeleton() }
+                    }
+                }
+                error != null -> {
+                    Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text(error ?: "", color = MaterialTheme.colorScheme.error)
+                            Button(
+                                onClick = { reloadKey++ },
+                                colors = ButtonDefaults.buttonColors(containerColor = MeetNGoColors.BrandTeal),
+                            ) { Text("Erneut versuchen") }
+                        }
+                    }
+                }
+                else -> {
+                    Column(modifier = Modifier.fillMaxSize()) {
                         Text(
-                            "Versuche es mit anderen Suchbegriffen oder Filtern",
+                            "${events.size} Event${if (events.size != 1) "s" else ""} gefunden",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp),
                         )
-                    }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(events, key = { it.id }) { event ->
-                        EventCard(event = event, onClick = {
-                            navController.navigate(Routes.eventDetail(event.id))
-                        })
+
+                        if (events.isEmpty()) {
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Keine Events gefunden", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        "Versuche es mit anderen Suchbegriffen oder Filtern",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                contentPadding = PaddingValues(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                items(events, key = { it.id }) { event ->
+                                    EventCard(event = event, onClick = {
+                                        navController.navigate(Routes.eventDetail(event.id))
+                                    })
+                                }
+                            }
+                        }
                     }
                 }
             }
+
+            PullToRefreshContainer(state = pullState, modifier = Modifier.align(Alignment.TopCenter))
         }
     }
 
     if (showFilterSheet) {
-        val sheetState = rememberModalBottomSheetState()
-        ModalBottomSheet(onDismissRequest = { showFilterSheet = false }, sheetState = sheetState) {
-            Column(modifier = Modifier.padding(16.dp).padding(bottom = 24.dp)) {
-                Text("Sortierung & Filter", style = MaterialTheme.typography.titleMedium)
-
-                Text(
-                    "Sortieren nach",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
-                )
-                FilterGrid(
-                    options = SORT_OPTIONS.map { it.label to (it.value == sort) },
-                    onSelect = { index -> sort = SORT_OPTIONS[index].value },
-                )
-
-                Text(
-                    "Reihenfolge",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
-                )
-                FilterGrid(
-                    options = listOf("Aufsteigend ↑" to (order == "asc"), "Absteigend ↓" to (order == "desc")),
-                    onSelect = { index -> order = if (index == 0) "asc" else "desc" },
-                )
-
-                Text(
-                    "Preis",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
-                )
-                val priceOptions = listOf("" to "Alle", "free" to "Kostenlos", "paid" to "Kostenpflichtig")
-                FilterGrid(
-                    options = priceOptions.map { it.second to (it.first == priceFilter) },
-                    onSelect = { index -> priceFilter = priceOptions[index].first },
-                )
-
-                Row(modifier = Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(
-                        onClick = {
-                            sort = "date"
-                            order = "asc"
-                            priceFilter = ""
-                        },
-                        modifier = Modifier.weight(1f),
-                    ) { Text("Zurücksetzen") }
-                    Button(
-                        onClick = { showFilterSheet = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = MeetNGoColors.BrandCoral),
-                        modifier = Modifier.weight(1f),
-                    ) { Text("Anwenden") }
-                }
-            }
-        }
-    }
-}
-
-/** Stellt eine Liste von Optionen als zweispaltiges Raster von Auswahl-Buttons dar (für das Filter-Bottom-Sheet). */
-@Composable
-private fun FilterGrid(options: List<Pair<String, Boolean>>, onSelect: (Int) -> Unit) {
-    val rows = options.chunked(2)
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        rows.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEachIndexed { i, (label, selected) ->
-                    val index = options.indexOfFirst { it.first == label }
-                    OutlinedButton(
-                        onClick = { onSelect(index) },
-                        colors = if (selected) {
-                            ButtonDefaults.outlinedButtonColors(
-                                containerColor = MeetNGoColors.BrandTeal.copy(alpha = 0.1f),
-                                contentColor = MeetNGoColors.BrandTeal,
-                            )
-                        } else {
-                            ButtonDefaults.outlinedButtonColors()
-                        },
-                        modifier = Modifier.weight(1f),
-                    ) { Text(label) }
-                }
-            }
-        }
+        EventFilterSheet(
+            filters = filters,
+            onFiltersChange = { filters = it },
+            onDismiss = { showFilterSheet = false },
+        )
     }
 }
 

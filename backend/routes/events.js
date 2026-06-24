@@ -67,7 +67,8 @@ function uploadImage(req, res, next) {
   });
 }
 
-// GET /api/events?search=&category=&sort=date|name|attendees|price&order=asc|desc&priceFilter=free|paid
+// GET /api/events?search=&category=&sort=date|name|attendees|price&order=asc|desc
+//   &priceFilter=free|paid&priceMax=&dateFrom=&dateTo=
 router.get("/", (req, res) => {
   const {
     search = "",
@@ -75,6 +76,9 @@ router.get("/", (req, res) => {
     sort = "date",
     order = "asc",
     priceFilter = "",
+    priceMax = "",
+    dateFrom = "",
+    dateTo = "",
     organizerId = "",
   } = req.query;
 
@@ -113,6 +117,26 @@ router.get("/", (req, res) => {
     query += " AND price = 'Kostenlos'";
   } else if (priceFilter === "paid") {
     query += " AND price != 'Kostenlos'";
+  }
+
+  // Maximalpreis: nur Events bis zu diesem numerischen Preiswert (kostenlose Events
+  // mit price_value 0 sind dadurch automatisch eingeschlossen).
+  const priceMaxValue = parseFloat(priceMax);
+  if (!Number.isNaN(priceMaxValue) && priceMaxValue > 0) {
+    query += " AND price_value <= ?";
+    params.push(priceMaxValue);
+  }
+
+  // Zeitfenster-Filter über die ISO-Datums-Strings (lexikografischer Vergleich genügt,
+  // da das Format "YYYY-MM-DDTHH:mm:ss" chronologisch sortierbar ist). Der Client liefert
+  // bereits aufgelöste Grenzen (z. B. aus den Presets "Heute"/"Wochenende").
+  if (dateFrom) {
+    query += " AND date >= ?";
+    params.push(dateFrom);
+  }
+  if (dateTo) {
+    query += " AND date <= ?";
+    params.push(dateTo);
   }
 
   // Gesamtzahl der gefilterten Treffer ermitteln, bevor ORDER BY/LIMIT greift —

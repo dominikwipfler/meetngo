@@ -7,6 +7,7 @@ const eventsRouter = require("./routes/events");
 const ticketsRouter = require("./routes/tickets");
 const usersRouter = require("./routes/users");
 const tilesRouter = require("./routes/tiles");
+const geocodeRouter = require("./routes/geocode");
 const { securityHeaders } = require("./middleware/securityHeaders");
 
 const app = express();
@@ -27,6 +28,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/events", eventsRouter);
 app.use("/api/tickets", ticketsRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/geocode", geocodeRouter);
 
 // Unknown API route -> JSON 404 (not Express's default HTML page).
 app.use("/api", (req, res) => {

@@ -24,9 +24,12 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Cancel
@@ -35,9 +38,9 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -68,17 +71,41 @@ import com.meetngo.app.data.api.BASE_URL
 import com.meetngo.app.data.model.Event
 import com.meetngo.app.data.model.UpdateEventRequest
 import com.meetngo.app.data.repository.AuthRepository
+import com.meetngo.app.ui.components.SkeletonLine
+import com.meetngo.app.ui.components.shimmer
 import com.meetngo.app.ui.navigation.Routes
 import com.meetngo.app.ui.screens.auth.toAuthErrorMessage
 import com.meetngo.app.ui.theme.MeetNGoColors
 import com.meetngo.app.util.formatDateShort
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 /** Baut aus einem relativen Backend-Pfad eine vollständige Bild-URL; absolute URLs werden unverändert übernommen. */
 private fun imageUrl(imagePath: String?): String? {
     if (imagePath.isNullOrBlank()) return null
     if (imagePath.startsWith("http")) return imagePath
     return BASE_URL.removeSuffix("/") + "/" + imagePath.trimStart('/')
+}
+
+/** Geschätzter Umsatz eines Events = Ticketpreis × Anzahl Teilnehmer (0 bei kostenlosen Events). */
+private fun eventRevenue(event: Event): Double = event.priceValue * event.attendees
+
+/** Formatiert einen Geldbetrag im deutschen Format ohne Nachkommastellen, z. B. "6.786 €". */
+private fun formatEuro(value: Double): String = String.format(Locale.GERMANY, "%,.0f €", value)
+
+/** Kurzes Countdown-Label bis zum Event, z. B. "Heute", "Morgen", "in 5 T." oder "Vorbei". */
+private fun daysUntilLabel(dateStr: String): String {
+    val eventDate = runCatching { LocalDateTime.parse(dateStr).toLocalDate() }.getOrNull() ?: return "—"
+    val days = ChronoUnit.DAYS.between(LocalDate.now(), eventDate)
+    return when {
+        days < 0 -> "Vorbei"
+        days == 0L -> "Heute"
+        days == 1L -> "Morgen"
+        else -> "in $days T."
+    }
 }
 
 /**
@@ -164,9 +191,7 @@ fun OrganizerDashboardScreen(
         )
 
         if (loading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            DashboardSkeleton()
         } else if (myEvents.isEmpty()) {
             Column(
                 modifier = Modifier
@@ -196,6 +221,35 @@ fun OrganizerDashboardScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
+                // Gesamtübersicht über alle Events des Veranstalters: Anzahl Events, Teilnehmer und
+                // geschätzter Gesamtumsatz – gibt dem Veranstalter auf einen Blick die wichtigsten Zahlen.
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(text = "Gesamtübersicht", style = MaterialTheme.typography.titleMedium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        StatCard(
+                            icon = Icons.Filled.Event,
+                            label = "Events",
+                            value = myEvents.size.toString(),
+                            modifier = Modifier.weight(1f),
+                        )
+                        StatCard(
+                            icon = Icons.Filled.People,
+                            label = "Teilnehmer",
+                            value = myEvents.sumOf { it.attendees }.toString(),
+                            modifier = Modifier.weight(1f),
+                        )
+                        StatCard(
+                            icon = Icons.Filled.Payments,
+                            label = "Umsatz",
+                            value = formatEuro(myEvents.sumOf { eventRevenue(it) }),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+
                 // Event-Auswahl-Tabs nur anzeigen, wenn der Veranstalter mehr als ein Event hat.
                 if (myEvents.size > 1) {
                     Row(
@@ -286,17 +340,64 @@ fun OrganizerDashboardScreen(
                                 modifier = Modifier.weight(1f),
                             )
                             StatCard(
-                                icon = Icons.Filled.Speed,
-                                label = "Kapazität",
-                                value = event.capacity?.toString() ?: "∞",
+                                icon = Icons.Filled.Payments,
+                                label = "Umsatz",
+                                value = if (event.priceValue > 0.0) formatEuro(eventRevenue(event)) else "Gratis",
                                 modifier = Modifier.weight(1f),
                             )
                             StatCard(
-                                icon = Icons.Filled.Sell,
-                                label = "Preis",
-                                value = if (event.price == "Kostenlos") "Frei" else "${event.price}€",
+                                icon = Icons.Filled.Schedule,
+                                label = "Countdown",
+                                value = daysUntilLabel(event.date),
                                 modifier = Modifier.weight(1f),
                             )
+                        }
+
+                        // Auslastung: Fortschrittsbalken Teilnehmer/Kapazität, sonst Hinweis auf
+                        // unbegrenzte Plätze. Gibt dem Veranstalter ein Gefühl, wie voll das Event ist.
+                        val capacity = event.capacity
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Icon(Icons.Filled.Speed, contentDescription = null, tint = MeetNGoColors.BrandTeal, modifier = Modifier.size(18.dp))
+                                        Text(text = "Auslastung", style = MaterialTheme.typography.titleSmall)
+                                    }
+                                    if (capacity != null && capacity > 0) {
+                                        val percent = (event.attendees.toFloat() / capacity * 100).toInt().coerceIn(0, 100)
+                                        Text(
+                                            text = "$percent %",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = MeetNGoColors.BrandTeal,
+                                        )
+                                    }
+                                }
+                                if (capacity != null && capacity > 0) {
+                                    val fraction = (event.attendees.toFloat() / capacity).coerceIn(0f, 1f)
+                                    LinearProgressIndicator(
+                                        progress = { fraction },
+                                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)),
+                                        color = MeetNGoColors.BrandTeal,
+                                        trackColor = MeetNGoColors.BrandTeal.copy(alpha = 0.15f),
+                                    )
+                                    val free = (capacity - event.attendees).coerceAtLeast(0)
+                                    Text(
+                                        text = "$free von $capacity Plätzen frei",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                } else {
+                                    Text(
+                                        text = "Unbegrenzte Plätze – ${event.attendees} Teilnehmer bisher",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -407,6 +508,58 @@ private fun ActionButton(
                 text = label,
                 color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
             )
+        }
+    }
+}
+
+/** Lade-Platzhalter für das Dashboard: imitiert Gesamtübersicht, Event-Karte und Statistik-Kacheln. */
+@Composable
+private fun DashboardSkeleton() {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            repeat(3) {
+                Card(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Box(modifier = Modifier.size(20.dp).shimmer(CircleShape))
+                        SkeletonLine(widthFraction = 0.7f, height = 16.dp)
+                        SkeletonLine(widthFraction = 0.9f, height = 10.dp)
+                    }
+                }
+            }
+        }
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(modifier = Modifier.size(80.dp).shimmer(RoundedCornerShape(12.dp)))
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    SkeletonLine(widthFraction = 0.6f, height = 18.dp)
+                    SkeletonLine(widthFraction = 0.4f, height = 12.dp)
+                    SkeletonLine(widthFraction = 0.3f, height = 12.dp)
+                }
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            repeat(3) {
+                Card(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        SkeletonLine(widthFraction = 0.6f, height = 18.dp)
+                        SkeletonLine(widthFraction = 0.8f, height = 10.dp)
+                    }
+                }
+            }
         }
     }
 }

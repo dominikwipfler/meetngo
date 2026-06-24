@@ -28,9 +28,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -73,6 +76,22 @@ fun RegisterScreen(
             }
         }
     }
+
+    val usernameFocusRequester = remember { FocusRequester() }
+    val emailFocusRequester = remember { FocusRequester() }
+    val passwordFocusRequester = remember { FocusRequester() }
+    val passwordConfirmFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(uiState.errorField) {
+        when (uiState.errorField) {
+            RegisterField.USERNAME -> usernameFocusRequester.requestFocus()
+            RegisterField.EMAIL -> emailFocusRequester.requestFocus()
+            RegisterField.PASSWORD -> passwordFocusRequester.requestFocus()
+            RegisterField.PASSWORD_CONFIRM -> passwordConfirmFocusRequester.requestFocus()
+            null -> {}
+        }
+    }
+    // E-Mail-Konflikt: zusätzlicher Hinweis mit Link zum Login statt nur der generischen Fehlermeldung.
+    val emailTaken = uiState.errorField == RegisterField.EMAIL && uiState.error == "E-Mail-Adresse bereits registriert"
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Zurück-Button navigiert zum vorherigen Screen (i. d. R. Login).
@@ -128,7 +147,13 @@ fun RegisterScreen(
                     placeholder = { Text("max.mustermann") },
                     singleLine = true,
                     colors = filledFieldColors,
-                    modifier = Modifier.fillMaxWidth(),
+                    isError = uiState.errorField == RegisterField.USERNAME,
+                    supportingText = {
+                        if (uiState.errorField == RegisterField.USERNAME && uiState.error == "Benutzername bereits vergeben") {
+                            Text(uiState.error)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().focusRequester(usernameFocusRequester),
                 )
             }
 
@@ -144,7 +169,24 @@ fun RegisterScreen(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     colors = filledFieldColors,
-                    modifier = Modifier.fillMaxWidth(),
+                    isError = uiState.errorField == RegisterField.EMAIL,
+                    supportingText = {
+                        if (emailTaken) {
+                            Row {
+                                Text(text = uiState.error, color = MaterialTheme.colorScheme.error)
+                                Text(
+                                    text = " Jetzt einloggen",
+                                    color = MeetNGoColors.BrandTeal,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.clickable {
+                                        PendingLoginEmail.set(uiState.email)
+                                        navController.navigate(Routes.LOGIN)
+                                    },
+                                )
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().focusRequester(emailFocusRequester),
                 )
             }
 
@@ -161,7 +203,8 @@ fun RegisterScreen(
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     colors = filledFieldColors,
-                    modifier = Modifier.fillMaxWidth(),
+                    isError = uiState.errorField == RegisterField.PASSWORD,
+                    modifier = Modifier.fillMaxWidth().focusRequester(passwordFocusRequester),
                 )
             }
 
@@ -179,12 +222,14 @@ fun RegisterScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { viewModel.register() }),
                     colors = filledFieldColors,
-                    modifier = Modifier.fillMaxWidth(),
+                    isError = uiState.errorField == RegisterField.PASSWORD_CONFIRM,
+                    modifier = Modifier.fillMaxWidth().focusRequester(passwordConfirmFocusRequester),
                 )
             }
 
-            // Fehlertext: lokale Validierungsfehler oder Backend-Fehlermeldung.
-            if (uiState.error.isNotBlank()) {
+            // Fehlertext: lokale Validierungsfehler oder Backend-Fehlermeldung. Beim E-Mail-Konflikt
+            // steht die Meldung bereits direkt unter dem E-Mail-Feld inkl. Login-Link (siehe oben).
+            if (uiState.error.isNotBlank() && !emailTaken) {
                 Text(
                     text = uiState.error,
                     color = MaterialTheme.colorScheme.error,

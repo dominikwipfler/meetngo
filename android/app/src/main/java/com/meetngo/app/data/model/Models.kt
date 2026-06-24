@@ -115,3 +115,6 @@ data class CheckinResponse(
 
 /** Generische Fehlerstruktur, in die Backend-Fehlerantworten (z. B. 4xx) deserialisiert werden. */
 data class ApiError(val error: String)
+
+/** Ein einzelner Adressvorschlag des Geocoding-Proxys (siehe [com.meetngo.app.data.api.ApiService.geocode]). */
+data class GeocodeResult(val label: String, val lat: Double, val lng: Double)

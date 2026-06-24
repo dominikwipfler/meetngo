@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,7 +29,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -36,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -63,6 +64,8 @@ import coil.compose.AsyncImage
 import com.meetngo.app.data.api.ApiService
 import com.meetngo.app.data.api.BASE_URL
 import com.meetngo.app.data.model.Event
+import com.meetngo.app.ui.components.SkeletonLine
+import com.meetngo.app.ui.components.shimmer
 import com.meetngo.app.ui.navigation.Routes
 import com.meetngo.app.ui.theme.MeetNGoColors
 import com.meetngo.app.util.formatDateShort
@@ -110,6 +113,11 @@ private val CATEGORY_COLORS = mapOf(
     "Tech" to Color(0xFF0EA5E9),
     "Kunst" to Color(0xFFEC4899),
     "Outdoor" to Color(0xFF84CC16),
+    "Familie" to Color(0xFFF59E0B),
+    "Bildung" to Color(0xFF8B5CF6),
+    "Markt" to Color(0xFFEF4444),
+    "Stadtleben" to Color(0xFF14B8A6),
+    "Nightlife" to Color(0xFFA855F7),
     "Sonstiges" to MeetNGoColors.BrandTeal,
 )
 
@@ -143,11 +151,17 @@ fun MapScreen(navController: NavHostController, apiService: ApiService) {
     val context = LocalContext.current
     var events by remember { mutableStateOf<List<Event>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    // Wird hochgezählt, um die Events erneut zu laden (z. B. nach einem fehlgeschlagenen Kaltstart).
+    var reloadKey by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var activeFilters by remember { mutableStateOf(setOf<String>()) }
     var selectedEvent by remember { mutableStateOf<Event?>(null) }
+    // Scroll-Zustand der unteren Event-Leiste, damit sie beim Antippen eines Markers automatisch
+    // zum ausgewählten Event scrollen kann.
+    val carouselState = rememberLazyListState()
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(reloadKey) {
+        isLoading = true
         try {
             events = apiService.getEvents(sort = "date", order = "asc")
         } catch (_: Exception) {
@@ -157,12 +171,25 @@ fun MapScreen(navController: NavHostController, apiService: ApiService) {
         }
     }
 
-    // Kombiniert Freitextsuche (Name/Ort) und Kategorie-Filter; beide Bedingungen müssen erfüllt sein.
-    val filtered = events.filter { event ->
-        val q = searchQuery.trim().lowercase()
-        val matchesQuery = q.isEmpty() || event.name.lowercase().contains(q) || event.location.lowercase().contains(q)
-        val matchesFilter = activeFilters.isEmpty() || activeFilters.contains(event.category)
-        matchesQuery && matchesFilter
+    // Kombiniert Freitextsuche (Name/Ort) und Kategorie-Auswahl (beide Bedingungen müssen erfüllt
+    // sein) und sortiert chronologisch — bewusst clientseitig auf der bereits einmalig geladenen
+    // Gesamtliste, da die Karte ohnehin alle Events zeigt. Die ausführlichen Filter (Datum, Preis,
+    // Sortierung) gibt es gezielt nur auf der Suchen-Seite.
+    val filtered = events
+        .filter { event ->
+            val q = searchQuery.trim().lowercase()
+            val matchesQuery = q.isEmpty() || event.name.lowercase().contains(q) || event.location.lowercase().contains(q)
+            val matchesCategory = activeFilters.isEmpty() || activeFilters.contains(event.category)
+            matchesQuery && matchesCategory
+        }
+        .sortedBy { it.date }
+
+    // Beim Antippen eines Karten-Markers (oder einer anderen Auswahl) rückt die untere Event-Leiste
+    // automatisch zum passenden Eintrag, sodass das gewählte Event direkt sichtbar ist.
+    LaunchedEffect(selectedEvent?.id, filtered) {
+        val id = selectedEvent?.id ?: return@LaunchedEffect
+        val index = filtered.indexOfFirst { it.id == id }
+        if (index >= 0) carouselState.animateScrollToItem(index)
     }
 
     // rememberUpdatedState hält den AndroidView-update-Block immer auf dem aktuellen Stand,
@@ -254,10 +281,6 @@ fun MapScreen(navController: NavHostController, apiService: ApiService) {
             },
         )
 
-        if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-        }
-
         // Search bar + category filter chips, floating over the map (web: absolute top-0).
         Column(
             modifier = Modifier
@@ -308,6 +331,7 @@ fun MapScreen(navController: NavHostController, apiService: ApiService) {
 
         // Horizontal event card carousel, floating over the map (web: absolute bottom-0).
         LazyRow(
+            state = carouselState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
@@ -315,14 +339,41 @@ fun MapScreen(navController: NavHostController, apiService: ApiService) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(horizontal = 12.dp),
         ) {
-            if (filtered.isEmpty()) {
+            if (isLoading) {
+                // Skeleton-Platzhalterkarten während des Ladens (statt eines Spinners).
+                items(3) {
+                    Card(modifier = Modifier.size(width = 240.dp, height = 96.dp)) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Box(modifier = Modifier.size(56.dp).shimmer(RoundedCornerShape(12.dp)))
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                SkeletonLine(widthFraction = 0.8f, height = 14.dp)
+                                SkeletonLine(widthFraction = 0.6f, height = 10.dp)
+                                SkeletonLine(widthFraction = 0.5f, height = 10.dp)
+                            }
+                        }
+                    }
+                }
+            } else if (filtered.isEmpty()) {
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            "Keine Events gefunden",
+                        Row(
                             modifier = Modifier.padding(12.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                "Keine Events gefunden",
+                                modifier = Modifier.weight(1f),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            TextButton(onClick = { reloadKey++ }) { Text("Erneut laden") }
+                        }
                     }
                 }
             } else {

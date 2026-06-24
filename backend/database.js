@@ -449,6 +449,312 @@ if (count.count === 0) {
   );
 }
 
+// Zusätzliche Demo-Events mit breiter Vielfalt (Neueröffnungen, Stadtveranstaltungen,
+// Familien-/Bildungs-/Kulturangebote …). Anders als der Block oben läuft dieser bei JEDEM
+// Start, fügt aber jedes Event nur dann ein, wenn noch keines mit gleichem Namen existiert.
+// So bekommt auch eine bereits bestehende Datenbank die neuen Events – ohne Duplikate.
+// image_path bleibt leer; der Backfill weiter unten ergänzt ein kategoriepassendes Bild.
+const additionalDemoEvents = [
+  // Neueröffnungen
+  {
+    name: "Neueröffnung: Rösterei & Café Bohnenwerk",
+    description:
+      "Die neue Kaffeerösterei in der Innenstadt lädt zur Eröffnung mit Gratis-Verkostung, Latte-Art-Show und Live-Musik. Schau vorbei und probiere frisch geröstete Bohnen.",
+    date: "2026-07-04T10:00:00",
+    location: "Kaiserstraße 88, Karlsruhe",
+    lat: 49.0092,
+    lng: 8.395,
+    organizer: "Bohnenwerk Kaffeerösterei",
+    price: "Kostenlos",
+    attendees: 120,
+    category: "Food",
+  },
+  {
+    name: "Eröffnung Boulderhalle Vertical KA",
+    description:
+      "Karlsruhes neue Boulderhalle öffnet ihre Tore. Am Eröffnungstag freier Eintritt, Schnupperkurse für Anfänger und ein Wettkampf für Fortgeschrittene.",
+    date: "2026-07-11T14:00:00",
+    location: "Durlacher Allee 67, Karlsruhe",
+    lat: 49.0083,
+    lng: 8.43,
+    organizer: "Vertical KA",
+    price: "Kostenlos",
+    attendees: 200,
+    category: "Sport",
+  },
+  {
+    name: "Neueröffnung Pop-up Concept Store",
+    description:
+      "Lokale Designerinnen und Designer präsentieren Mode, Schmuck und Wohnaccessoires im neuen Pop-up-Store. Mit Sektempfang zur Eröffnung.",
+    date: "2026-07-19T11:00:00",
+    location: "Erbprinzenstraße 14, Karlsruhe",
+    lat: 49.0085,
+    lng: 8.4015,
+    organizer: "KA Kreativwirtschaft",
+    price: "Kostenlos",
+    attendees: 80,
+    category: "Sonstiges",
+  },
+  // Stadtveranstaltungen
+  {
+    name: "Stadtfest am Marktplatz",
+    description:
+      "Drei Tage Bühnenprogramm, regionale Stände und Mitmach-Aktionen rund um den Marktplatz. Veranstaltet von der Stadt Karlsruhe für alle Generationen.",
+    date: "2026-07-18T12:00:00",
+    location: "Marktplatz Karlsruhe",
+    lat: 49.0094,
+    lng: 8.4044,
+    organizer: "Stadt Karlsruhe",
+    price: "Kostenlos",
+    attendees: 4200,
+    category: "Sonstiges",
+  },
+  {
+    name: "Tag der offenen Tür im Rathaus",
+    description:
+      "Die Stadtverwaltung öffnet ihre Türen: Blicke hinter die Kulissen, Gespräche mit dem Oberbürgermeister und Infostände der Ämter.",
+    date: "2026-09-12T10:00:00",
+    location: "Rathaus am Marktplatz, Karlsruhe",
+    lat: 49.009,
+    lng: 8.404,
+    organizer: "Stadt Karlsruhe",
+    price: "Kostenlos",
+    attendees: 650,
+    category: "Sonstiges",
+  },
+  {
+    name: "Bürgerdialog Mobilität",
+    description:
+      "Öffentliche Informations- und Diskussionsveranstaltung der Stadt zur Zukunft des Verkehrs in Karlsruhe. Bring deine Ideen und Fragen mit.",
+    date: "2026-10-01T18:00:00",
+    location: "Bürgersaal im Rathaus, Karlsruhe",
+    lat: 49.0089,
+    lng: 8.4041,
+    organizer: "Stadt Karlsruhe",
+    price: "Kostenlos",
+    attendees: 90,
+    category: "Sonstiges",
+  },
+  {
+    name: "Adventsmarkt am Friedrichsplatz",
+    description:
+      "Stimmungsvoller Adventsmarkt mit Kunsthandwerk, Glühwein und einem täglichen Bühnenprogramm. Ein Angebot der Stadt für die Vorweihnachtszeit.",
+    date: "2026-12-05T11:00:00",
+    location: "Friedrichsplatz Karlsruhe",
+    lat: 49.0072,
+    lng: 8.404,
+    organizer: "Stadt Karlsruhe",
+    price: "Kostenlos",
+    attendees: 1800,
+    category: "Food",
+  },
+  // Bildung & Kultur
+  {
+    name: "Autorenlesung in der Stadtbibliothek",
+    description:
+      "Eine bekannte Autorin liest aus ihrem neuen Roman und beantwortet im Anschluss Fragen aus dem Publikum. Mit Signierstunde.",
+    date: "2026-09-25T19:00:00",
+    location: "Stadtbibliothek im Neuen Ständehaus, Karlsruhe",
+    lat: 49.0079,
+    lng: 8.4007,
+    organizer: "Stadtbibliothek Karlsruhe",
+    price: "5,00",
+    attendees: 70,
+    category: "Kunst",
+  },
+  {
+    name: "Open-Air-Kino im Schlossgarten",
+    description:
+      "Lauschiger Filmabend unter freiem Himmel: aktuelle Kinohighlights auf großer Leinwand. Liegestühle und Snacks vor Ort.",
+    date: "2026-08-14T21:00:00",
+    location: "Schlossgarten Karlsruhe",
+    lat: 49.015,
+    lng: 8.405,
+    organizer: "Kulturamt Karlsruhe",
+    price: "9,00",
+    attendees: 300,
+    category: "Kunst",
+  },
+  {
+    name: "Effekte – Wissenschaftsfestival",
+    description:
+      "Forschung zum Anfassen mitten in der Stadt: Mitmach-Experimente, Science-Slams und Vorträge der Karlsruher Hochschulen und Institute.",
+    date: "2026-09-26T11:00:00",
+    location: "Kronenplatz Karlsruhe",
+    lat: 49.009,
+    lng: 8.4115,
+    organizer: "Stadt Karlsruhe & KIT",
+    price: "Kostenlos",
+    attendees: 900,
+    category: "Tech",
+  },
+  {
+    name: "Museumsnacht: Neue Ausstellung im ZKM",
+    description:
+      "Eröffnung der neuen Medienkunst-Ausstellung mit Führungen, Künstlergesprächen und Performances bis Mitternacht.",
+    date: "2026-10-31T18:00:00",
+    location: "ZKM Karlsruhe",
+    lat: 49.0052,
+    lng: 8.3895,
+    organizer: "ZKM",
+    price: "12,00",
+    attendees: 500,
+    category: "Kunst",
+  },
+  // Familie & Nachbarschaft
+  {
+    name: "Familienfest im Stadtgarten",
+    description:
+      "Großes Kinder- und Familienfest mit Bastelstationen, Ponyreiten, Hüpfburg und Bühnenshow. Ein Tag voller Spaß für Klein und Groß.",
+    date: "2026-08-30T11:00:00",
+    location: "Zoologischer Stadtgarten Karlsruhe",
+    lat: 48.9966,
+    lng: 8.4017,
+    organizer: "Stadtgarten Karlsruhe",
+    price: "8,00",
+    attendees: 750,
+    category: "Sonstiges",
+  },
+  {
+    name: "Repair-Café Oststadt",
+    description:
+      "Gemeinsam reparieren statt wegwerfen: Ehrenamtliche helfen beim Instandsetzen von Elektrogeräten, Kleidung und Fahrrädern. Werkzeug ist vorhanden.",
+    date: "2026-07-12T14:00:00",
+    location: "Quartier Zukunft, Rintheimer Straße, Karlsruhe",
+    lat: 49.0165,
+    lng: 8.4365,
+    organizer: "Quartier Zukunft",
+    price: "Kostenlos",
+    attendees: 45,
+    category: "Sonstiges",
+  },
+  {
+    name: "Regionaler Bauernmarkt",
+    description:
+      "Frische Erzeugnisse direkt von Höfen aus der Region: Obst, Gemüse, Käse, Honig und Backwaren. Jeden Samstag rund um den Stephanplatz.",
+    date: "2026-07-25T08:00:00",
+    location: "Stephanplatz Karlsruhe",
+    lat: 49.01,
+    lng: 8.398,
+    organizer: "Marktgemeinschaft Karlsruhe",
+    price: "Kostenlos",
+    attendees: 350,
+    category: "Food",
+  },
+  // Wirtschaft & Karriere
+  {
+    name: "Jobmesse Karriere KA",
+    description:
+      "Über 80 regionale Arbeitgeber stellen sich vor. Mit Bewerbungsmappen-Check, Vorträgen und der Möglichkeit für Spontan-Interviews.",
+    date: "2026-10-15T09:00:00",
+    location: "Messe Karlsruhe, Rheinstetten",
+    lat: 48.97,
+    lng: 8.333,
+    organizer: "Agentur für Arbeit Karlsruhe",
+    price: "Kostenlos",
+    attendees: 1600,
+    category: "Tech",
+  },
+  // Sport & Outdoor
+  {
+    name: "Drachenbootrennen am Rhein",
+    description:
+      "Spannende Teamrennen auf dem Wasser: Firmen-, Vereins- und Hobbyteams treten gegeneinander an. Mit Rahmenprogramm am Ufer.",
+    date: "2026-08-23T10:00:00",
+    location: "Rheinhafen Karlsruhe",
+    lat: 48.975,
+    lng: 8.33,
+    organizer: "Kanu Club Karlsruhe",
+    price: "5,00",
+    attendees: 480,
+    category: "Sport",
+  },
+  {
+    name: "Nachtwächter-Stadtführung",
+    description:
+      "Eine unterhaltsame Führung durch die Karlsruher Altstadt bei Einbruch der Dunkelheit – mit Geschichten und Anekdoten vergangener Zeiten.",
+    date: "2026-08-07T20:30:00",
+    location: "Treffpunkt Marktplatz, Karlsruhe",
+    lat: 49.0095,
+    lng: 8.4043,
+    organizer: "Stadtführungen Karlsruhe",
+    price: "14,00",
+    attendees: 25,
+    category: "Outdoor",
+  },
+  // Unterhaltung
+  {
+    name: "Comedy Night im Tollhaus",
+    description:
+      "Ein Abend voller Lacher mit aufstrebenden und etablierten Comedians der deutschen Stand-up-Szene.",
+    date: "2026-10-09T20:00:00",
+    location: "Tollhaus, Alter Schlachthof Karlsruhe",
+    lat: 49.0024,
+    lng: 8.4145,
+    organizer: "Tollhaus e.V.",
+    price: "22,00",
+    attendees: 260,
+    category: "Sonstiges",
+  },
+  {
+    name: "Weinfest am Gutenbergplatz",
+    description:
+      "Badische Winzer schenken ihre besten Tropfen aus, dazu regionale Spezialitäten und entspannte Live-Musik am Abend.",
+    date: "2026-09-05T16:00:00",
+    location: "Gutenbergplatz Karlsruhe",
+    lat: 49.005,
+    lng: 8.3855,
+    organizer: "Winzergenossenschaft Baden",
+    price: "Kostenlos",
+    attendees: 600,
+    category: "Food",
+  },
+];
+
+const insertAdditionalEvent = db.prepare(`
+  INSERT INTO events (name, description, date, location, lat, lng, organizer, price, price_value, attendees, category)
+  SELECT @name, @description, @date, @location, @lat, @lng, @organizer, @price, @price_value, @attendees, @category
+  WHERE NOT EXISTS (SELECT 1 FROM events WHERE name = @name)
+`);
+db.transaction(() => {
+  for (const e of additionalDemoEvents) {
+    insertAdditionalEvent.run({ ...e, price_value: parsePriceValue(e.price) });
+  }
+})();
+
+// Demo-Events feiner kategorisieren, damit die zusätzlichen Filter-Tags (Familie, Bildung, Markt,
+// Stadtleben, Nightlife) echte Treffer liefern. Läuft idempotent bei jedem Start und betrifft nur
+// Demo-Events (organizer_id IS NULL) – von Nutzern angelegte Events behalten ihre Kategorie.
+const demoCategoryReassignments = {
+  Stadtleben: [
+    "Stadtfest am Marktplatz",
+    "Tag der offenen Tür im Rathaus",
+    "Bürgerdialog Mobilität",
+    "Neueröffnung Pop-up Concept Store",
+  ],
+  Bildung: [
+    "Autorenlesung in der Stadtbibliothek",
+    "Effekte – Wissenschaftsfestival",
+    "KI & Gesellschaft",
+  ],
+  Markt: [
+    "Regionaler Bauernmarkt",
+    "Adventsmarkt am Friedrichsplatz",
+    "Flohmarkt am Schlossplatz",
+    "Weihnachtsmarkt",
+  ],
+  Familie: ["Familienfest im Stadtgarten", "Brettspiele-Abend", "Repair-Café Oststadt"],
+  Nightlife: ["Comedy Night im Tollhaus", "Silent Disco im Stadtgarten"],
+};
+const reassignCategory = db.prepare(
+  "UPDATE events SET category = ? WHERE name = ? AND organizer_id IS NULL",
+);
+db.transaction(() => {
+  for (const [cat, names] of Object.entries(demoCategoryReassignments)) {
+    for (const n of names) reassignCategory.run(cat, n);
+  }
+})();
+
 // Backfill realistic, category-appropriate demo images for seeded events.
 // Images are bundled in backend/uploads/seed and served by the backend itself
 // (see app.js: app.use("/uploads", ...)), so they load reliably on every device
@@ -466,6 +772,12 @@ const CATEGORY_IMAGES = {
   Kunst: ["/uploads/seed/kunst1.jpg", "/uploads/seed/kunst2.jpg"],
   Outdoor: ["/uploads/seed/outdoor1.jpg", "/uploads/seed/outdoor2.jpg"],
   Sonstiges: ["/uploads/seed/sonstiges1.jpg", "/uploads/seed/sonstiges2.jpg"],
+  // Neue Kategorien greifen mangels eigener Motive auf passende vorhandene Bilder zurück.
+  Familie: ["/uploads/seed/sonstiges1.jpg", "/uploads/seed/sonstiges2.jpg"],
+  Bildung: ["/uploads/seed/tech1.jpg", "/uploads/seed/tech2.jpg"],
+  Markt: ["/uploads/seed/food1.jpg", "/uploads/seed/food2.jpg"],
+  Stadtleben: ["/uploads/seed/sonstiges1.jpg", "/uploads/seed/sonstiges2.jpg"],
+  Nightlife: ["/uploads/seed/musik1.jpg", "/uploads/seed/musik2.jpg"],
 };
 const FALLBACK_IMAGES = CATEGORY_IMAGES.Sonstiges;
 
